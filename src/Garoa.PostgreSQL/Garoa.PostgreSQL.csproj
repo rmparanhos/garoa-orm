@@ -4,11 +4,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
-    <PackageId>Garoa</PackageId>
-    <Description>Garoa ORM — a lightweight, high-performance .NET data mapper. A Dapper alternative focused on performance, simplicity and clarity.</Description>
+    <PackageId>Garoa.PostgreSQL</PackageId>
+    <Description>PostgreSQL provider for Garoa ORM — streaming bulk insert over the Npgsql binary COPY protocol.</Description>
     <Authors>Garoa ORM contributors</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>orm;dapper;micro-orm;ado.net;postgresql;mysql;data</PackageTags>
+    <PackageTags>orm;dapper;micro-orm;postgresql;npgsql;bulk;copy</PackageTags>
     <RepositoryUrl>https://github.com/rmparanhos/garoa-orm</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -21,9 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Garoa.Tests" />
-    <InternalsVisibleTo Include="Garoa.PostgreSQL" />
-    <InternalsVisibleTo Include="Garoa.MySql" />
+    <PackageReference Include="Npgsql" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Garoa\Garoa.csproj" />
   </ItemGroup>
 
 </Project>

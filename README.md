@@ -26,10 +26,17 @@ Pre-release. The v1 surface is intentionally tiny — see [`ROADMAP.md`](ROADMAP
 | ---------------------- | ------------------------------- | ------------------------------ |
 | SELECT                 | `Query<T>` → `List<T>`          | Cached mapper                  |
 | INSERT/UPDATE/DELETE   | `Execute`                       | Returns rows affected          |
-| Bulk insert (planned)  | `BulkInsert<T>(IEnumerable<T>)` | Streaming, never in memory     |
+| Bulk insert            | `BulkInsert<T>(IEnumerable<T>)` | Streaming, never in memory     |
 
-`Query<T>`, `Execute` and their `…Async` counterparts are implemented today. Bulk insert and
-the dedicated PostgreSQL/MySQL provider packages are next.
+`Query<T>`, `Execute`, `BulkInsert<T>` and their `…Async` counterparts are implemented today.
+
+## Packages
+
+| Package            | Contents                                                              |
+| ------------------ | -------------------------------------------------------------------- |
+| `Garoa`            | Core: `Query`/`Execute`, the mapper, and the bulk-insert plumbing.   |
+| `Garoa.PostgreSQL` | `BulkInsert` for PostgreSQL via Npgsql's binary COPY protocol.       |
+| `Garoa.MySql`      | `BulkInsert` for MySQL via MySqlConnector's `MySqlBulkCopy`.         |
 
 ## Usage
 
@@ -56,6 +63,33 @@ int affected = connection.Execute(
 List<Person> page = await connection.QueryAsync<Person>(
     "SELECT id, name, birth_date FROM people LIMIT @Take", new { Take = 50 });
 ```
+
+### Bulk insert
+
+For high-volume inserts, `BulkInsert` streams rows straight to the server — it never builds a
+giant `INSERT` string and never materialises the source sequence, so a million rows cost roughly
+one row's worth of memory. Each provider package adds the extension to its own connection type:
+
+```csharp
+// PostgreSQL — Npgsql binary COPY. Returns the number of rows written.
+using Garoa; // brings the BulkInsert extension into scope
+
+await using var pg = new NpgsqlConnection(connectionString);
+ulong written = await pg.BulkInsertAsync("people", people);
+
+// MySQL — MySqlBulkCopy. The connection string needs AllowLoadLocalInfile=True.
+await using var mysql = new MySqlConnection("...;AllowLoadLocalInfile=True");
+long inserted = await mysql.BulkInsertAsync("people", people);
+
+// Write a subset / control column order (e.g. let the DB assign an identity column):
+await pg.BulkInsertAsync("people", people, columns: new[] { "name", "birth_date" });
+```
+
+> **Column names on the write side are explicit.** Unlike `Query<T>` — which has the result
+> set's real column names and matches them case- and underscore-insensitively — `BulkInsert`
+> must *emit* the destination column names. They come from the member name or `[Column("…")]`,
+> or the `columns` argument. For a snake_case table, annotate members with `[Column("birth_date")]`
+> or pass explicit `columns`.
 
 ### Mapping rules
 

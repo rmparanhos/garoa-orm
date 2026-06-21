@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-test:
-    name: Build & Test
+    name: Build & Unit Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,5 +24,58 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
-      - name: Test
-        run: dotnet test --configuration Release --no-build --verbosity normal
+      - name: Unit test
+        run: dotnet test tests/Garoa.Tests/Garoa.Tests.csproj --configuration Release --no-build --verbosity normal
+
+  integration-test:
+    name: Integration Test (PostgreSQL + MySQL)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: garoa_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: garoa_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      GAROA_PG_CONN: "Host=127.0.0.1;Port=5432;Username=postgres;Password=postgres;Database=garoa_test"
+      GAROA_MYSQL_CONN: "Server=127.0.0.1;Port=3306;User ID=root;Password=root;Database=garoa_test;AllowLoadLocalInfile=True"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Enable MySQL local_infile
+        # MySqlBulkCopy uses LOAD DATA LOCAL INFILE, which the server has off by default.
+        run: mysql -h 127.0.0.1 -uroot -proot -e "SET GLOBAL local_infile = 1;"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Integration test
+        run: dotnet test tests/Garoa.IntegrationTests/Garoa.IntegrationTests.csproj --configuration Release
