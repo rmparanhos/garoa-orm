@@ -101,6 +101,13 @@ await pg.BulkInsertAsync("people", people, columns: new[] { "name", "birth_date"
 - Connections that are closed when a call begins are opened and then closed again — callers
   never leak a connection they didn't open.
 
+## Performance
+
+Garoa is benchmarked against Dapper in the same run (Dapper as the `[Baseline]`). It is faster
+on single-row reads, within ~12% of Dapper's IL mapper on large result sets, and consistently
+allocates ~25–31% less memory. See [`benchmarks/`](benchmarks/README.md) for numbers and how to
+run them; CI tracks the ratio on every push to `main` and fails on a regression.
+
 ## Building
 
 ```bash

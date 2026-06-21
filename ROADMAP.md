@@ -94,9 +94,13 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
   containers (`.github/workflows/ci.yml`).
 - [x] CI/CD: **publish the NuGet packages** (`Garoa`, `Garoa.PostgreSQL`, `Garoa.MySql`) on a
   `v*.*.*` tag (`.github/workflows/publish.yml`; requires the `NUGET_API_KEY` secret).
-- [ ] Performance CI: relative benchmark Garoa vs Dapper using BenchmarkDotNet
-  `[Baseline]`. Runs on push to `main` (not on PRs). Threshold TBD during
-  implementation. Result published as an Actions artifact to track regressions.
+- [x] Performance CI: relative benchmark Garoa vs Dapper using BenchmarkDotNet
+  `[Baseline]` (`benchmarks/Garoa.Benchmarks`). Runs on push to `main` (not on PRs).
+  Threshold set to **1.30x** (`check_threshold.py` + `GAROA_BENCH_THRESHOLD`). Results
+  published as an Actions artifact to track regressions.
+  - Baseline numbers: Garoa is ~11% faster at 1 row, ~8–12% slower at 100–1000 rows, and
+    allocates ~25–31% less memory than Dapper.
+  - [ ] Add a bulk-insert benchmark (Garoa providers vs naive multi-row INSERT).
 
 ---
 
