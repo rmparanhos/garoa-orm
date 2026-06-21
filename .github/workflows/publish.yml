@@ -1,0 +1,62 @@
+name: Publish NuGet package
+
+# Publishes Garoa to nuget.org when a version tag is pushed (e.g. v1.0.0 or v1.2.3-beta.1).
+# The package version is derived from the tag, so the tag is the single source of truth.
+#
+# Required repository secret:
+#   NUGET_API_KEY — an API key from nuget.org with push rights for the Garoa package id.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Pack & Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Derive version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Test
+        run: dotnet test --configuration Release
+
+      - name: Build (version-stamped)
+        run: dotnet build src/Garoa/Garoa.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Pack
+        run: >-
+          dotnet pack src/Garoa/Garoa.csproj
+          --configuration Release
+          --no-build
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:PackageReleaseNotes="Release ${{ github.ref_name }}"
+          --output ${{ github.workspace }}/artifacts
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-package
+          path: ${{ github.workspace }}/artifacts/*.nupkg
+
+      - name: Push to nuget.org
+        run: >-
+          dotnet nuget push "${{ github.workspace }}/artifacts/*.nupkg"
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

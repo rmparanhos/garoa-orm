@@ -1,0 +1,30 @@
+## .NET / build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+artifacts/
+*.user
+*.suo
+
+## Test / coverage
+[Tt]est[Rr]esults/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.trx
+
+## BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.DotSettings.user
+
+## OS
+.DS_Store
+Thumbs.db
