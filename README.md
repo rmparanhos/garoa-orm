@@ -1,1 +1,120 @@
-# garoa-orm
+# Garoa ORM
+
+A lightweight, high-performance .NET data mapper — an alternative to Dapper focused on
+**performance, simplicity and clarity**.
+
+The name references TypeScript's [Drizzle ORM](https://orm.drizzle.team/) — *garoa* is
+Portuguese for *drizzle*.
+
+## Why Garoa
+
+Garoa maps result sets with **runtime-compiled expression trees** (no IL emission) and reads
+every value through `DbDataReader.GetFieldValue<T>()`, delegating type handling to the
+provider. That design choice solves several long-standing micro-ORM pain points directly:
+
+- **`DateOnly` / `TimeOnly` work natively** on PostgreSQL (and anywhere the provider supports
+  them) — no manual type handlers required.
+- **Mapping errors name the right column.** When a conversion fails, the exception identifies
+  the offending column by name and ordinal — not the previously-read one.
+- **No fragile IL.** Mappers are compiled expression trees, cached by type + column layout.
+
+## Status
+
+Pre-release. The v1 surface is intentionally tiny — see [`ROADMAP.md`](ROADMAP.md).
+
+| Operation              | Method                          | Notes                          |
+| ---------------------- | ------------------------------- | ------------------------------ |
+| SELECT                 | `Query<T>` → `List<T>`          | Cached mapper                  |
+| INSERT/UPDATE/DELETE   | `Execute`                       | Returns rows affected          |
+| Bulk insert            | `BulkInsert<T>(IEnumerable<T>)` | Streaming, never in memory     |
+
+`Query<T>`, `Execute`, `BulkInsert<T>` and their `…Async` counterparts are implemented today.
+
+## Packages
+
+| Package            | Contents                                                              |
+| ------------------ | -------------------------------------------------------------------- |
+| `Garoa`            | Core: `Query`/`Execute`, the mapper, and the bulk-insert plumbing.   |
+| `Garoa.PostgreSQL` | `BulkInsert` for PostgreSQL via Npgsql's binary COPY protocol.       |
+| `Garoa.MySql`      | `BulkInsert` for MySQL via MySqlConnector's `MySqlBulkCopy`.         |
+
+## Usage
+
+```csharp
+using Garoa;
+
+// Works over any ADO.NET provider (Npgsql, MySqlConnector, SQLite, …).
+await using var connection = new NpgsqlConnection(connectionString);
+
+// SELECT — rows are mapped to T by a compiled, cached mapper.
+List<Person> people = connection.Query<Person>(
+    "SELECT id, name, birth_date FROM people WHERE active = @Active",
+    new { Active = true });
+
+// Scalars work too.
+List<int> ids = connection.Query<int>("SELECT id FROM people");
+
+// INSERT / UPDATE / DELETE — returns rows affected.
+int affected = connection.Execute(
+    "UPDATE people SET name = @Name WHERE id = @Id",
+    new { Id = 1, Name = "Ada" });
+
+// Async variants accept a CancellationToken.
+List<Person> page = await connection.QueryAsync<Person>(
+    "SELECT id, name, birth_date FROM people LIMIT @Take", new { Take = 50 });
+```
+
+### Bulk insert
+
+For high-volume inserts, `BulkInsert` streams rows straight to the server — it never builds a
+giant `INSERT` string and never materialises the source sequence, so a million rows cost roughly
+one row's worth of memory. Each provider package adds the extension to its own connection type:
+
+```csharp
+// PostgreSQL — Npgsql binary COPY. Returns the number of rows written.
+using Garoa; // brings the BulkInsert extension into scope
+
+await using var pg = new NpgsqlConnection(connectionString);
+ulong written = await pg.BulkInsertAsync("people", people);
+
+// MySQL — MySqlBulkCopy. The connection string needs AllowLoadLocalInfile=True.
+await using var mysql = new MySqlConnection("...;AllowLoadLocalInfile=True");
+long inserted = await mysql.BulkInsertAsync("people", people);
+
+// Write a subset / control column order (e.g. let the DB assign an identity column):
+await pg.BulkInsertAsync("people", people, columns: new[] { "name", "birth_date" });
+```
+
+> **Column names on the write side are explicit.** Unlike `Query<T>` — which has the result
+> set's real column names and matches them case- and underscore-insensitively — `BulkInsert`
+> must *emit* the destination column names. They come from the member name or `[Column("…")]`,
+> or the `columns` argument. For a snake_case table, annotate members with `[Column("birth_date")]`
+> or pass explicit `columns`.
+
+### Mapping rules
+
+- Column-to-member matching is case-insensitive and underscore-insensitive: `birth_date`
+  binds to `BirthDate`.
+- Use `[Column("name")]` for an explicit column name.
+- `null` becomes the member's default (or `null` for nullable/reference types).
+- Enums are read from their numeric column value.
+- Connections that are closed when a call begins are opened and then closed again — callers
+  never leak a connection they didn't open.
+
+## Performance
+
+Garoa is benchmarked against Dapper in the same run (Dapper as the `[Baseline]`). It is faster
+on single-row reads, within ~12% of Dapper's IL mapper on large result sets, and consistently
+allocates ~25–31% less memory. See [`benchmarks/`](benchmarks/README.md) for numbers and how to
+run them; CI tracks the ratio on every push to `main` and fails on a regression.
+
+## Building
+
+```bash
+dotnet build
+dotnet test
+```
+
+## License
+
+MIT.

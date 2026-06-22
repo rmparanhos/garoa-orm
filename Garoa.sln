@@ -1,0 +1,66 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{52730625-6EEA-4333-9EC6-141F00D9AE3E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Garoa", "src\Garoa\Garoa.csproj", "{3AB44F98-375B-4353-8B20-04082EED0B15}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{C6EB3FA7-CA91-40EE-B685-71E15CBDAFDC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Garoa.Tests", "tests\Garoa.Tests\Garoa.Tests.csproj", "{E3BA8B62-2F55-496F-99C9-C5E3B2D84A1D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Garoa.PostgreSQL", "src\Garoa.PostgreSQL\Garoa.PostgreSQL.csproj", "{DAEFCF64-0FD2-46DA-B1FF-6688F434679C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Garoa.MySql", "src\Garoa.MySql\Garoa.MySql.csproj", "{310CD498-4F66-4E1D-91D5-756AFDD345EF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Garoa.IntegrationTests", "tests\Garoa.IntegrationTests\Garoa.IntegrationTests.csproj", "{DCDDB3B8-7F29-40F1-808F-CC737D0A38A5}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "benchmarks", "benchmarks", "{A1D60053-C978-4368-AFD6-4A3D105E9AD8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Garoa.Benchmarks", "benchmarks\Garoa.Benchmarks\Garoa.Benchmarks.csproj", "{5D52E925-2B23-44BB-A4D5-AE96591621C7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3AB44F98-375B-4353-8B20-04082EED0B15}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3AB44F98-375B-4353-8B20-04082EED0B15}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3AB44F98-375B-4353-8B20-04082EED0B15}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3AB44F98-375B-4353-8B20-04082EED0B15}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E3BA8B62-2F55-496F-99C9-C5E3B2D84A1D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E3BA8B62-2F55-496F-99C9-C5E3B2D84A1D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E3BA8B62-2F55-496F-99C9-C5E3B2D84A1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E3BA8B62-2F55-496F-99C9-C5E3B2D84A1D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DAEFCF64-0FD2-46DA-B1FF-6688F434679C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DAEFCF64-0FD2-46DA-B1FF-6688F434679C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DAEFCF64-0FD2-46DA-B1FF-6688F434679C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DAEFCF64-0FD2-46DA-B1FF-6688F434679C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{310CD498-4F66-4E1D-91D5-756AFDD345EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{310CD498-4F66-4E1D-91D5-756AFDD345EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{310CD498-4F66-4E1D-91D5-756AFDD345EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{310CD498-4F66-4E1D-91D5-756AFDD345EF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DCDDB3B8-7F29-40F1-808F-CC737D0A38A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DCDDB3B8-7F29-40F1-808F-CC737D0A38A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DCDDB3B8-7F29-40F1-808F-CC737D0A38A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DCDDB3B8-7F29-40F1-808F-CC737D0A38A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D52E925-2B23-44BB-A4D5-AE96591621C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D52E925-2B23-44BB-A4D5-AE96591621C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D52E925-2B23-44BB-A4D5-AE96591621C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D52E925-2B23-44BB-A4D5-AE96591621C7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3AB44F98-375B-4353-8B20-04082EED0B15} = {52730625-6EEA-4333-9EC6-141F00D9AE3E}
+		{E3BA8B62-2F55-496F-99C9-C5E3B2D84A1D} = {C6EB3FA7-CA91-40EE-B685-71E15CBDAFDC}
+		{DAEFCF64-0FD2-46DA-B1FF-6688F434679C} = {52730625-6EEA-4333-9EC6-141F00D9AE3E}
+		{310CD498-4F66-4E1D-91D5-756AFDD345EF} = {52730625-6EEA-4333-9EC6-141F00D9AE3E}
+		{DCDDB3B8-7F29-40F1-808F-CC737D0A38A5} = {C6EB3FA7-CA91-40EE-B685-71E15CBDAFDC}
+		{5D52E925-2B23-44BB-A4D5-AE96591621C7} = {A1D60053-C978-4368-AFD6-4A3D105E9AD8}
+	EndGlobalSection
+EndGlobal

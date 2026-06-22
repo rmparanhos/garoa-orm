@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <PackageId>Garoa</PackageId>
+    <Description>Garoa ORM — a lightweight, high-performance .NET data mapper. A Dapper alternative focused on performance, simplicity and clarity.</Description>
+    <Authors>Garoa ORM contributors</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>orm;dapper;micro-orm;ado.net;postgresql;mysql;data</PackageTags>
+    <RepositoryUrl>https://github.com/rmparanhos/garoa-orm</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Garoa.Tests" />
+    <InternalsVisibleTo Include="Garoa.PostgreSQL" />
+    <InternalsVisibleTo Include="Garoa.MySql" />
+  </ItemGroup>
+
+</Project>
