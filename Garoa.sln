@@ -21,6 +21,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "benchmarks", "benchmarks", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Garoa.Benchmarks", "benchmarks\Garoa.Benchmarks\Garoa.Benchmarks.csproj", "{5D52E925-2B23-44BB-A4D5-AE96591621C7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Garoa.SourceGenerator", "src\Garoa.SourceGenerator\Garoa.SourceGenerator.csproj", "{DE23E175-4C13-4FEF-99E5-8DF453BB5636}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -54,6 +56,10 @@ Global
 		{5D52E925-2B23-44BB-A4D5-AE96591621C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5D52E925-2B23-44BB-A4D5-AE96591621C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5D52E925-2B23-44BB-A4D5-AE96591621C7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DE23E175-4C13-4FEF-99E5-8DF453BB5636}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DE23E175-4C13-4FEF-99E5-8DF453BB5636}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DE23E175-4C13-4FEF-99E5-8DF453BB5636}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DE23E175-4C13-4FEF-99E5-8DF453BB5636}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{3AB44F98-375B-4353-8B20-04082EED0B15} = {52730625-6EEA-4333-9EC6-141F00D9AE3E}
@@ -62,5 +68,6 @@ Global
 		{310CD498-4F66-4E1D-91D5-756AFDD345EF} = {52730625-6EEA-4333-9EC6-141F00D9AE3E}
 		{DCDDB3B8-7F29-40F1-808F-CC737D0A38A5} = {C6EB3FA7-CA91-40EE-B685-71E15CBDAFDC}
 		{5D52E925-2B23-44BB-A4D5-AE96591621C7} = {A1D60053-C978-4368-AFD6-4A3D105E9AD8}
+		{DE23E175-4C13-4FEF-99E5-8DF453BB5636} = {52730625-6EEA-4333-9EC6-141F00D9AE3E}
 	EndGlobalSection
 EndGlobal

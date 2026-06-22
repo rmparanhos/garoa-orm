@@ -45,6 +45,13 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
 - [x] Error messages identify the **correct** column by name + ordinal on a failed
   conversion (fixes the Dapper bug where the previous column was reported).
 - [x] Snake_case / `[Column]` matching, nullable + enum handling.
+- [x] **Compile-time mapper via source generator** (`[GaroaMapped]`). A Roslyn
+  `IIncrementalGenerator` (`Garoa.SourceGenerator`, shipped as an analyzer inside the
+  `Garoa` package) emits an `IGaroaRowMapper<T>` per annotated type — typed reader getters
+  (`GetInt64`, …) for BCL types, `GetFieldValue<T>` for provider-resolved ones (DateOnly).
+  No runtime `.Compile()`, Native-AOT/trimming friendly, same mapping semantics and
+  column-accurate errors. Opt-in; unmarked types keep using the runtime mapper. The runtime
+  prefers the generated mapper automatically (self-registered via a module initializer).
 
 ### Query / Execute
 
@@ -85,9 +92,12 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
 ## Tooling, CI/CD & infrastructure
 
 - [x] Solution + project structure (`src/`, `tests/`, `Directory.Build.props`).
+- [x] Source generator project (`src/Garoa.SourceGenerator`, netstandard2.0 Roslyn analyzer),
+  referenced as an analyzer by the core and packed into the `Garoa` NuGet under
+  `analyzers/dotnet/cs`.
 - [x] Unit tests for the mapper (incl. DateOnly/TimeOnly, null handling, enums, wrong-
-  column error message) + end-to-end tests over SQLite + bulk core (`BulkColumnSet`,
-  `ObjectDataReader`).
+  column error message), the **generated** mapper (same coverage, asserts the generator ran),
+  end-to-end tests over SQLite + bulk core (`BulkColumnSet`, `ObjectDataReader`).
 - [x] Integration tests against live PostgreSQL + MySQL (`Garoa.IntegrationTests`, skipped
   unless `GAROA_PG_CONN` / `GAROA_MYSQL_CONN` are set).
 - [x] CI: build + unit test, plus an integration job with PostgreSQL + MySQL service
@@ -113,6 +123,14 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
 A "Drizzle in C#": a headless ORM with a query builder that reads like SQL but is
 type-safe. C# source generators give an edge over TypeScript here — stronger type
 safety with errors at compile time.
+
+The source-generator infrastructure landed first as the compile-time mapper
+(`[GaroaMapped]` → `IGaroaRowMapper<T>`); it's the foundation the type-safe query
+builder will build on.
+
+- [ ] Closing the read-mapping gap with Dapper on large result sets: measure
+  `[GaroaMapped]` types in the benchmark (expected to erase the ~8–19% deficit since
+  typed getters replace the generic `GetFieldValue<T>` dispatch).
 
 ---
 
