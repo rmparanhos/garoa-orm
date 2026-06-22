@@ -2,25 +2,49 @@
 
 Relative performance of Garoa vs [Dapper](https://github.com/DapperLib/Dapper), measured in the
 same run with Dapper as the BenchmarkDotNet `[Baseline]`. Both libraries run the *exact same*
-query over the *same* in-memory SQLite connection, so the ADO.NET overhead is identical and the
+query over the *same* connection, so the ADO.NET overhead is identical and the
 **`Ratio` column is the meaningful number** — runner noise hits both rows equally, keeping the
 ratio stable even when absolute timings drift.
+
+## Benchmark classes
+
+| Class                   | Connection     | Env var required   |
+| ----------------------- | -------------- | ------------------ |
+| `QueryBenchmarks`       | In-memory SQLite | *(none)*          |
+| `PostgresQueryBenchmarks` | PostgreSQL   | `GAROA_PG_CONN`    |
+| `MySqlQueryBenchmarks`  | MySQL          | `GAROA_MYSQL_CONN` |
+
+All three classes benchmark the same scenario: Garoa `Query<T>` vs Dapper `Query<T>` for
+N rows of a 5-column POCO, with `N ∈ {1, 100, 1000}`.
 
 ## Running locally
 
 ```bash
+# All benchmarks (requires GAROA_PG_CONN and GAROA_MYSQL_CONN to be set):
 dotnet run -c Release --project benchmarks/Garoa.Benchmarks -- --filter '*'
+
+# SQLite only (no database server needed):
+dotnet run -c Release --project benchmarks/Garoa.Benchmarks -- --filter '*SQLite*'
+
+# PostgreSQL only:
+GAROA_PG_CONN="Host=localhost;Username=postgres;Password=...;Database=garoa_bench" \
+  dotnet run -c Release --project benchmarks/Garoa.Benchmarks -- --filter '*Postgres*'
 ```
 
 Results land in `benchmarks/Garoa.Benchmarks/BenchmarkDotNet.Artifacts/results/`.
 
 ## Regression gate
 
-CI runs these on every push to `main` (not on PRs) and fails if Garoa regresses past the
-threshold (Garoa mean must stay within `1.30x` of Dapper's mean). The check is
-[`check_threshold.py`](check_threshold.py); the threshold is set via the
-`GAROA_BENCH_THRESHOLD` env var in `.github/workflows/benchmark.yml`. Full results are published
-as a workflow artifact so the ratio can be tracked over time.
+CI runs these on every push to `main` and on every PR targeting `main`, and fails if Garoa
+regresses past the threshold (Garoa mean must stay within `1.30x` of Dapper's mean). The check
+is [`check_threshold.py`](check_threshold.py); the threshold is set via the
+`GAROA_BENCH_THRESHOLD` env var in `.github/workflows/benchmark.yml`.
+
+Results are also:
+- Published as a **workflow artifact** on every run.
+- **Committed** to the `benchmark-results` branch (one directory per run, timestamped) for
+  long-term tracking.
+- **Posted as a PR comment** when the workflow runs on a pull request.
 
 ## Reference numbers
 

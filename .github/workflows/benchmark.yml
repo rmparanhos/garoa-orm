@@ -1,15 +1,20 @@
 name: Benchmark
 
 # Relative performance benchmark: Garoa vs Dapper, with Dapper as the BenchmarkDotNet
-# [Baseline]. Runs on push to main (not on PRs) so the ratio is tracked over time; results are
-# published as an artifact and the build fails if Garoa regresses past the threshold.
+# [Baseline]. Runs on push to main and on pull requests targeting main, so regressions are
+# caught before merging. Results are published as an artifact, posted as a PR comment, and
+# committed to the benchmark-results branch for long-term tracking.
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 env:
   # Garoa mean must stay within this multiple of Dapper's mean. See benchmarks/check_threshold.py.
@@ -19,6 +24,38 @@ jobs:
   benchmark:
     name: Garoa vs Dapper
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: garoa_bench
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: garoa_bench
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      GAROA_PG_CONN: "Host=127.0.0.1;Port=5432;Username=postgres;Password=postgres;Database=garoa_bench"
+      GAROA_MYSQL_CONN: "Server=127.0.0.1;Port=3306;User ID=root;Password=root;Database=garoa_bench"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -43,3 +80,69 @@ jobs:
           python3 benchmarks/check_threshold.py
           benchmarks/Garoa.Benchmarks/BenchmarkDotNet.Artifacts/results
           --threshold "${GAROA_BENCH_THRESHOLD}"
+
+      - name: Post benchmark summary on PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RESULTS_DIR="benchmarks/Garoa.Benchmarks/BenchmarkDotNet.Artifacts/results"
+          {
+            printf "## Benchmark Results\n\n"
+            printf "Garoa vs Dapper — **Ratio** is the meaningful column "
+            printf "(runner noise hits both equally, so the ratio is stable).\n\n"
+            for f in "${RESULTS_DIR}"/*.md; do
+              [ -f "$f" ] || continue
+              printf "### %s\n\n" "$(basename "$f" -report.md)"
+              cat "$f"
+              printf "\n\n"
+            done
+          } > pr_comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file pr_comment.md
+
+      - name: Persist results to benchmark-results branch
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          RUN_DIR="runs/${TIMESTAMP}-${SHORT_SHA}"
+          RESULTS_SRC="benchmarks/Garoa.Benchmarks/BenchmarkDotNet.Artifacts/results"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Switch to (or create) the benchmark-results branch.
+          # Result files are gitignored so they survive the branch switch.
+          if git ls-remote --exit-code origin benchmark-results > /dev/null 2>&1; then
+            git fetch origin benchmark-results
+            git checkout -b benchmark-results origin/benchmark-results
+          else
+            git checkout --orphan benchmark-results
+            git rm -rf . --quiet 2>/dev/null || true
+          fi
+
+          mkdir -p "${RUN_DIR}"
+          if ls "${RESULTS_SRC}"/* 1>/dev/null 2>&1; then
+            cp "${RESULTS_SRC}"/* "${RUN_DIR}/"
+          fi
+
+          {
+            echo "ref: ${{ github.ref }}"
+            echo "sha: ${{ github.sha }}"
+            echo "run_id: ${{ github.run_id }}"
+            echo "timestamp: ${TIMESTAMP}"
+            echo "event: ${{ github.event_name }}"
+            echo "branch: ${{ github.ref_name }}"
+          } > "${RUN_DIR}/meta.txt"
+
+          git add "${RUN_DIR}"
+          git commit -m "bench: ${TIMESTAMP} (${{ github.ref_name }} ${SHORT_SHA})" \
+            || echo "Nothing to commit"
+          git push origin benchmark-results
