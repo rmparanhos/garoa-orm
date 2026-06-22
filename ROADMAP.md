@@ -114,7 +114,11 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
   - [x] Benchmark over real **PostgreSQL** and **MySQL** connections in addition to SQLite
     (`PostgresQueryBenchmarks`, `MySqlQueryBenchmarks` — same service containers as
     integration tests).
-  - [ ] Add a bulk-insert benchmark (Garoa providers vs naive multi-row INSERT).
+  - [x] Add a bulk-insert benchmark (Garoa providers vs naive multi-row INSERT):
+    `PostgresBulkInsertBenchmarks` / `MySqlBulkInsertBenchmarks` compare streaming `BulkInsert`
+    (COPY / `MySqlBulkCopy`, `GaroaBulk`) against a chunked multi-row `INSERT` (`NaiveInsert`,
+    the `[Baseline]`) for 1 000 / 10 000 rows. Gated by `GAROA_BULK_THRESHOLD` (`GaroaBulk` must
+    stay within `1.20x` of `NaiveInsert`; expected well under 1).
 
 ---
 

@@ -6,7 +6,7 @@ query over the *same* connection, so the ADO.NET overhead is identical and the
 **`Ratio` column is the meaningful number** — runner noise hits both rows equally, keeping the
 ratio stable even when absolute timings drift.
 
-## Benchmark classes
+## Read-mapping benchmarks
 
 | Class                   | Connection     | Env var required   |
 | ----------------------- | -------------- | ------------------ |
@@ -27,6 +27,26 @@ The `GaroaGenerated` row isolates the effect of the source generator: it uses ty
 instead of the generic `GetFieldValue<T>` dispatch, so comparing it against `Garoa` shows how much
 of the gap versus Dapper the generator closes.
 
+## Bulk-insert benchmarks
+
+| Class                          | Connection  | Env var required   |
+| ------------------------------ | ----------- | ------------------ |
+| `PostgresBulkInsertBenchmarks` | PostgreSQL  | `GAROA_PG_CONN`    |
+| `MySqlBulkInsertBenchmarks`    | MySQL       | `GAROA_MYSQL_CONN` (with `AllowLoadLocalInfile=True`) |
+
+These measure writing `N ∈ {1 000, 10 000}` rows two ways (`NaiveInsert` is the `[Baseline]`):
+
+| Method        | What it measures                                                                  |
+| ------------- | --------------------------------------------------------------------------------- |
+| `NaiveInsert` | The naive multi-row parameterised `INSERT` a developer hand-writes (chunked at 1 000 rows/statement). |
+| `GaroaBulk`   | Garoa's streaming `BulkInsert` — PostgreSQL binary `COPY` / MySQL `MySqlBulkCopy`. |
+
+Here the meaningful number is the `GaroaBulk / NaiveInsert` ratio, which should be **well below 1**:
+the provider bulk paths avoid per-statement parsing and round-trips. The classes use
+BenchmarkDotNet's `RunStrategy.Monitoring` with an `[IterationSetup]` that truncates the table, so
+each iteration is exactly one full bulk load against an empty table (no primary-key clashes). They
+need a real server and will throw in `[GlobalSetup]` if the env var is unset.
+
 ## Running locally
 
 ```bash
@@ -46,9 +66,17 @@ Results land in `benchmarks/Garoa.Benchmarks/BenchmarkDotNet.Artifacts/results/`
 ## Regression gate
 
 CI runs these on every push to `main` and on every PR targeting `main`, and fails if Garoa
-regresses past the threshold (Garoa mean must stay within `1.30x` of Dapper's mean). The check
-is [`check_threshold.py`](check_threshold.py); the threshold is set via the
-`GAROA_BENCH_THRESHOLD` env var in `.github/workflows/benchmark.yml`.
+regresses past the threshold. Two gates run via [`check_threshold.py`](check_threshold.py):
+
+- **Read mapping** — `Garoa` mean must stay within `1.30x` of `Dapper`'s mean
+  (`GAROA_BENCH_THRESHOLD`).
+- **Bulk insert** — `GaroaBulk` mean must stay within `1.20x` of `NaiveInsert`'s mean
+  (`GAROA_BULK_THRESHOLD`, `--baseline NaiveInsert --candidate GaroaBulk`). This is a loose safety
+  net; in practice the ratio is well under 1.
+
+Both thresholds are set in `.github/workflows/benchmark.yml`. The script keys each report by
+benchmark class, so a gate silently skips any class that lacks both of its named methods (the bulk
+gate ignores the read-mapping classes and vice versa).
 
 Results are also:
 - Published as a **workflow artifact** on every run.

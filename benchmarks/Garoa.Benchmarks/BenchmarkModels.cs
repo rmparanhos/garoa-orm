@@ -23,3 +23,36 @@ public sealed class BenchOrderMapped
     public long Quantity { get; set; }
     public string? Status { get; set; }
 }
+
+// Row written by the bulk-insert benchmarks. The [Column] attributes map the PascalCase members to
+// the snake_case-free lowercase table columns so the COPY/bulk-copy column list and the multi-row
+// INSERT both target the same physical layout. (Today the write side emits member/[Column] names
+// verbatim, so the attribute is required here.)
+public sealed class BenchBulkRow
+{
+    [Column("id")] public long Id { get; set; }
+    [Column("customer")] public string? Customer { get; set; }
+    [Column("amount")] public double Amount { get; set; }
+    [Column("quantity")] public long Quantity { get; set; }
+    [Column("status")] public string? Status { get; set; }
+
+    /// <summary>Generates <paramref name="count"/> deterministic rows with ids 1..count.</summary>
+    public static BenchBulkRow[] Generate(int count)
+    {
+        var rows = new BenchBulkRow[count];
+        for (int i = 0; i < count; i++)
+        {
+            int n = i + 1;
+            rows[i] = new BenchBulkRow
+            {
+                Id = n,
+                Customer = $"Customer {n}",
+                Amount = n * 1.5,
+                Quantity = n % 10,
+                Status = n % 2 == 0 ? "Open" : "Closed",
+            };
+        }
+
+        return rows;
+    }
+}
