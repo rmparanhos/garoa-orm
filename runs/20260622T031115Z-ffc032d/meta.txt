@@ -1,0 +1,6 @@
+ref: refs/pull/2/merge
+sha: ffc032d7c07a60080831c570520435691d989453
+run_id: 27926979652
+timestamp: 20260622T031115Z
+event: pull_request
+branch: 2/merge
