@@ -20,9 +20,9 @@ env:
   # Garoa mean must stay within this multiple of Dapper's mean. See benchmarks/check_threshold.py.
   GAROA_BENCH_THRESHOLD: "1.30"
   # Safety net for the bulk benchmarks: Garoa's streaming bulk insert must stay within this
-  # multiple of the naive multi-row INSERT. It should be comfortably below 1 in practice; the loose
-  # bound only fires on a real regression (e.g. bulk silently degrading to per-row inserts) while
-  # tolerating the bulk path's fixed setup cost at the smaller row count.
+  # multiple of the Dapper multi-row INSERT baseline. It should be comfortably below 1 in practice;
+  # the loose bound only fires on a real regression (e.g. bulk silently degrading to per-row
+  # inserts) while tolerating the bulk path's fixed setup cost at the smaller row count.
   GAROA_BULK_THRESHOLD: "1.20"
 
 jobs:
@@ -91,12 +91,12 @@ jobs:
           benchmarks/Garoa.Benchmarks/BenchmarkDotNet.Artifacts/results
           --threshold "${GAROA_BENCH_THRESHOLD}"
 
-      - name: Enforce bulk-insert threshold (GaroaBulk vs NaiveInsert)
+      - name: Enforce bulk-insert threshold (GaroaBulk vs Dapper multi-row INSERT)
         run: >-
           python3 benchmarks/check_threshold.py
           benchmarks/Garoa.Benchmarks/BenchmarkDotNet.Artifacts/results
           --threshold "${GAROA_BULK_THRESHOLD}"
-          --baseline NaiveInsert --candidate GaroaBulk
+          --baseline Dapper --candidate GaroaBulk
 
       - name: Post benchmark summary on PR
         if: github.event_name == 'pull_request'

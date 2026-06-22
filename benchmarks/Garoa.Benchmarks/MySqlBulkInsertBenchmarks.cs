@@ -8,19 +8,20 @@ using MySqlConnector;
 namespace Garoa.Benchmarks;
 
 /// <summary>
-/// Bulk insert over a real MySQL connection, comparing three ways to write the same rows to the
-/// same table (Dapper is the <see cref="BenchmarkAttribute.Baseline"/>, matching the rest of the
-/// suite):
+/// Bulk insert over a real MySQL connection, comparing the two ways to write the same rows to the
+/// same table:
 /// <list type="bullet">
-///   <item><c>Dapper</c> — idiomatic <c>Execute(sql, rows)</c>; Dapper has no bulk path, so this is
-///   one server round-trip per row.</item>
-///   <item><c>NaiveInsert</c> — the naive multi-row parameterised <c>INSERT</c> a developer would
-///   otherwise hand-write (chunked).</item>
+///   <item><c>Dapper</c> (the <see cref="BenchmarkAttribute.Baseline"/>) — a chunked multi-row
+///   <c>INSERT ... VALUES (...),(...)</c> executed through Dapper's <c>Execute</c>. This is the
+///   fair "Dapper insert": Dapper is just the executor, so hand-writing the multi-row statement is
+///   the best a Dapper user can do without a bulk API (a per-row <c>Execute</c> loop is an
+///   anti-pattern — one round-trip and one commit per row — and is deliberately not measured here).</item>
 ///   <item><c>GaroaBulk</c> — Garoa's streaming <see cref="MySqlBulkCopy"/>.</item>
 /// </list>
-/// The reported <c>Ratio</c> is therefore "vs Dapper"; <c>GaroaBulk</c> should be a small fraction
-/// of it. The CI regression gate separately tracks <c>GaroaBulk</c> against <c>NaiveInsert</c> (the
-/// tougher reference), computed straight from the raw means.
+/// The bulk-copy path beats the multi-row INSERT because it skips per-statement SQL parsing,
+/// streams the rows, and never materialises a giant statement — so it is both faster and far
+/// lighter on allocations. The CI regression gate tracks <c>GaroaBulk</c> against this <c>Dapper</c>
+/// baseline.
 /// <para>
 /// Pinned to one invocation per iteration (<c>invocationCount: 1</c>) with an
 /// <c>[IterationSetup]</c> that truncates the table — so each measured iteration is exactly one
@@ -35,10 +36,6 @@ namespace Garoa.Benchmarks;
 public class MySqlBulkInsertBenchmarks
 {
     private const int ChunkSize = 1000;
-
-    // Single-row INSERT used by the Dapper baseline; @-parameters bind to BenchBulkRow's members.
-    private const string InsertSql =
-        "INSERT INTO bench_bulk (id, customer, amount, quantity, status) VALUES (@Id, @Customer, @Amount, @Quantity, @Status)";
 
     private MySqlConnection _connection = null!;
     private BenchBulkRow[] _rows = null!;
@@ -91,19 +88,16 @@ public class MySqlBulkInsertBenchmarks
         truncate.ExecuteNonQuery();
     }
 
-    // Idiomatic Dapper "bulk" insert: Execute with the row sequence runs the INSERT once per row.
+    // The fair Dapper insert: a chunked multi-row INSERT VALUES executed through Dapper.
     [Benchmark(Baseline = true)]
-    public int Dapper() => SqlMapper.Execute(_connection, InsertSql, _rows);
-
-    [Benchmark]
-    public void NaiveInsert()
+    public void Dapper()
     {
         for (int offset = 0; offset < _rows.Length; offset += ChunkSize)
         {
             int count = Math.Min(ChunkSize, _rows.Length - offset);
 
-            using MySqlCommand cmd = _connection.CreateCommand();
             var sql = new StringBuilder("INSERT INTO bench_bulk (id, customer, amount, quantity, status) VALUES ");
+            var parameters = new DynamicParameters();
 
             for (int i = 0; i < count; i++)
             {
@@ -116,15 +110,14 @@ public class MySqlBulkInsertBenchmarks
                    .Append(",@status").Append(i).Append(')');
 
                 BenchBulkRow r = _rows[offset + i];
-                cmd.Parameters.AddWithValue($"@id{i}", r.Id);
-                cmd.Parameters.AddWithValue($"@customer{i}", (object?)r.Customer ?? DBNull.Value);
-                cmd.Parameters.AddWithValue($"@amount{i}", r.Amount);
-                cmd.Parameters.AddWithValue($"@quantity{i}", r.Quantity);
-                cmd.Parameters.AddWithValue($"@status{i}", (object?)r.Status ?? DBNull.Value);
+                parameters.Add($"id{i}", r.Id);
+                parameters.Add($"customer{i}", r.Customer);
+                parameters.Add($"amount{i}", r.Amount);
+                parameters.Add($"quantity{i}", r.Quantity);
+                parameters.Add($"status{i}", r.Status);
             }
 
-            cmd.CommandText = sql.ToString();
-            cmd.ExecuteNonQuery();
+            SqlMapper.Execute(_connection, sql.ToString(), parameters);
         }
     }
 

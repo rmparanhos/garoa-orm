@@ -34,22 +34,25 @@ of the gap versus Dapper the generator closes.
 | `PostgresBulkInsertBenchmarks` | PostgreSQL  | `GAROA_PG_CONN`    |
 | `MySqlBulkInsertBenchmarks`    | MySQL       | `GAROA_MYSQL_CONN` (with `AllowLoadLocalInfile=True`) |
 
-These measure writing `N ∈ {1 000, 10 000}` rows three ways (Dapper is the `[Baseline]`, as in the
+These measure writing `N ∈ {1 000, 10 000}` rows two ways (Dapper is the `[Baseline]`, as in the
 read-mapping benchmarks):
 
-| Method        | What it measures                                                                  |
-| ------------- | --------------------------------------------------------------------------------- |
-| `Dapper`      | Idiomatic Dapper `Execute(sql, rows)` — Dapper has no bulk path, so this is **one round-trip per row** (baseline). |
-| `NaiveInsert` | The naive multi-row parameterised `INSERT` a developer hand-writes (chunked at 1 000 rows/statement). |
-| `GaroaBulk`   | Garoa's streaming `BulkInsert` — PostgreSQL binary `COPY` / MySQL `MySqlBulkCopy`. |
+| Method      | What it measures                                                                  |
+| ----------- | --------------------------------------------------------------------------------- |
+| `Dapper`    | A chunked multi-row `INSERT ... VALUES (...),(...)` executed through Dapper's `Execute` (baseline). Dapper has no bulk API, so this hand-written multi-row statement is the best a Dapper user can do. |
+| `GaroaBulk` | Garoa's streaming `BulkInsert` — PostgreSQL binary `COPY` / MySQL `MySqlBulkCopy`. |
 
-The displayed `Ratio` column is therefore "vs Dapper", and `GaroaBulk` should be a small fraction of
-it — the provider bulk paths avoid per-statement parsing and per-row round-trips. The CI regression
-gate is stricter: it compares `GaroaBulk` against `NaiveInsert` (the best hand-written approach),
-computed straight from the raw means independently of the BenchmarkDotNet `[Baseline]`. Each class
-pins `invocationCount: 1` with an `[IterationSetup]` that truncates the table, so each iteration is
-exactly one full bulk load against an empty table (no primary-key clashes). They need a real server
-and will throw in `[GlobalSetup]` if the env var is unset.
+The fair comparison here is **`GaroaBulk` vs a competent Dapper multi-row insert**, not vs a per-row
+`Execute` loop. A row-by-row loop (one round-trip and one commit per row) is a common anti-pattern
+that is ~50–150× slower than either approach, but that gap is about row-by-row execution, not the
+library — so it is deliberately *not* the baseline. The `Ratio` column is therefore "vs the Dapper
+multi-row INSERT", and `GaroaBulk` should sit comfortably below 1: `COPY` / `MySqlBulkCopy` skip
+per-statement SQL parsing, stream the rows, and never build a giant statement (hence far fewer
+allocations). The CI regression gate tracks `GaroaBulk` against this baseline.
+
+Each class pins `invocationCount: 1` with an `[IterationSetup]` that truncates the table, so each
+iteration is exactly one full bulk load against an empty table (no primary-key clashes). They need a
+real server and will throw in `[GlobalSetup]` if the env var is unset.
 
 ## Running locally
 
@@ -74,9 +77,9 @@ regresses past the threshold. Two gates run via [`check_threshold.py`](check_thr
 
 - **Read mapping** — `Garoa` mean must stay within `1.30x` of `Dapper`'s mean
   (`GAROA_BENCH_THRESHOLD`).
-- **Bulk insert** — `GaroaBulk` mean must stay within `1.20x` of `NaiveInsert`'s mean
-  (`GAROA_BULK_THRESHOLD`, `--baseline NaiveInsert --candidate GaroaBulk`). This is a loose safety
-  net; in practice the ratio is well under 1.
+- **Bulk insert** — `GaroaBulk` mean must stay within `1.20x` of the `Dapper` multi-row INSERT mean
+  (`GAROA_BULK_THRESHOLD`, `--baseline Dapper --candidate GaroaBulk`). This is a loose safety net; in
+  practice the ratio is well under 1.
 
 Both thresholds are set in `.github/workflows/benchmark.yml`. The script keys each report by
 benchmark class, so a gate silently skips any class that lacks both of its named methods (the bulk

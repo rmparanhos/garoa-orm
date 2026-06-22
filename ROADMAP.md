@@ -114,12 +114,13 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
   - [x] Benchmark over real **PostgreSQL** and **MySQL** connections in addition to SQLite
     (`PostgresQueryBenchmarks`, `MySqlQueryBenchmarks` — same service containers as
     integration tests).
-  - [x] Add a bulk-insert benchmark (Garoa providers vs naive multi-row INSERT vs Dapper):
+  - [x] Add a bulk-insert benchmark (Garoa bulk vs Dapper multi-row INSERT):
     `PostgresBulkInsertBenchmarks` / `MySqlBulkInsertBenchmarks` compare streaming `BulkInsert`
-    (COPY / `MySqlBulkCopy`, `GaroaBulk`) against a chunked multi-row `INSERT` (`NaiveInsert`) and
-    idiomatic Dapper `Execute(sql, rows)` — one round-trip per row — (`Dapper`, the `[Baseline]`)
-    for 1 000 / 10 000 rows. The displayed ratio is vs Dapper; the CI gate `GAROA_BULK_THRESHOLD`
-    separately holds `GaroaBulk` within `1.20x` of `NaiveInsert` (expected well under 1).
+    (COPY / `MySqlBulkCopy`, `GaroaBulk`) against a chunked multi-row `INSERT ... VALUES` executed
+    through Dapper (`Dapper`, the `[Baseline]`) for 1 000 / 10 000 rows. The baseline is a competent
+    multi-row insert, not a per-row `Execute` loop (an anti-pattern, deliberately not measured). The
+    CI gate `GAROA_BULK_THRESHOLD` holds `GaroaBulk` within `1.20x` of the Dapper baseline (expected
+    well under 1).
 
 ---
 
