@@ -128,9 +128,10 @@ The source-generator infrastructure landed first as the compile-time mapper
 (`[GaroaMapped]` → `IGaroaRowMapper<T>`); it's the foundation the type-safe query
 builder will build on.
 
-- [ ] Closing the read-mapping gap with Dapper on large result sets: measure
-  `[GaroaMapped]` types in the benchmark (expected to erase the ~8–19% deficit since
-  typed getters replace the generic `GetFieldValue<T>` dispatch).
+- [x] Closing the read-mapping gap with Dapper on large result sets: the benchmark now
+  measures a `[GaroaMapped]` type (`GaroaGenerated` row) alongside the runtime mapper,
+  isolating the source generator's effect (typed getters vs the generic `GetFieldValue<T>`
+  dispatch) across SQLite, PostgreSQL and MySQL.
 
 ---
 

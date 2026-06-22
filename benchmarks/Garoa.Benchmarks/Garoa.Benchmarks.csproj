@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Garoa\Garoa.csproj" />
+    <ProjectReference Include="..\..\src\Garoa.SourceGenerator\Garoa.SourceGenerator.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

@@ -79,17 +79,14 @@ public class MySqlQueryBenchmarks
     }
 
     [Benchmark(Baseline = true)]
-    public List<Order> Dapper() => SqlMapper.Query<Order>(_connection, Sql).AsList();
+    public List<BenchOrder> Dapper() => SqlMapper.Query<BenchOrder>(_connection, Sql).AsList();
 
+    // Runtime expression-tree mapper (BenchOrder is not [GaroaMapped]).
     [Benchmark]
-    public List<Order> Garoa() => GaroaConnectionExtensions.Query<Order>(_connection, Sql);
+    public List<BenchOrder> Garoa() => GaroaConnectionExtensions.Query<BenchOrder>(_connection, Sql);
 
-    public sealed class Order
-    {
-        public long Id { get; set; }
-        public string? Customer { get; set; }
-        public double Amount { get; set; }
-        public long Quantity { get; set; }
-        public string? Status { get; set; }
-    }
+    // Compile-time source-generated mapper (BenchOrderMapped is [GaroaMapped]).
+    [Benchmark]
+    public List<BenchOrderMapped> GaroaGenerated() =>
+        GaroaConnectionExtensions.Query<BenchOrderMapped>(_connection, Sql);
 }

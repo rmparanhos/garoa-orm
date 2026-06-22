@@ -14,8 +14,18 @@ ratio stable even when absolute timings drift.
 | `PostgresQueryBenchmarks` | PostgreSQL   | `GAROA_PG_CONN`    |
 | `MySqlQueryBenchmarks`  | MySQL          | `GAROA_MYSQL_CONN` |
 
-All three classes benchmark the same scenario: Garoa `Query<T>` vs Dapper `Query<T>` for
-N rows of a 5-column POCO, with `N ∈ {1, 100, 1000}`.
+All three classes benchmark the same scenario for `N ∈ {1, 100, 1000}` rows of a 5-column POCO,
+with three methods (Dapper is the `[Baseline]`):
+
+| Method           | What it measures                                                            |
+| ---------------- | --------------------------------------------------------------------------- |
+| `Dapper`         | Dapper's IL-based mapper (baseline).                                         |
+| `Garoa`          | Garoa's **runtime** expression-tree mapper (`BenchOrder`, not annotated).   |
+| `GaroaGenerated` | Garoa's **compile-time** source-generated mapper (`BenchOrderMapped`, `[GaroaMapped]`). |
+
+The `GaroaGenerated` row isolates the effect of the source generator: it uses typed reader getters
+instead of the generic `GetFieldValue<T>` dispatch, so comparing it against `Garoa` shows how much
+of the gap versus Dapper the generator closes.
 
 ## Running locally
 
