@@ -34,18 +34,22 @@ of the gap versus Dapper the generator closes.
 | `PostgresBulkInsertBenchmarks` | PostgreSQL  | `GAROA_PG_CONN`    |
 | `MySqlBulkInsertBenchmarks`    | MySQL       | `GAROA_MYSQL_CONN` (with `AllowLoadLocalInfile=True`) |
 
-These measure writing `N ∈ {1 000, 10 000}` rows two ways (`NaiveInsert` is the `[Baseline]`):
+These measure writing `N ∈ {1 000, 10 000}` rows three ways (Dapper is the `[Baseline]`, as in the
+read-mapping benchmarks):
 
 | Method        | What it measures                                                                  |
 | ------------- | --------------------------------------------------------------------------------- |
+| `Dapper`      | Idiomatic Dapper `Execute(sql, rows)` — Dapper has no bulk path, so this is **one round-trip per row** (baseline). |
 | `NaiveInsert` | The naive multi-row parameterised `INSERT` a developer hand-writes (chunked at 1 000 rows/statement). |
 | `GaroaBulk`   | Garoa's streaming `BulkInsert` — PostgreSQL binary `COPY` / MySQL `MySqlBulkCopy`. |
 
-Here the meaningful number is the `GaroaBulk / NaiveInsert` ratio, which should be **well below 1**:
-the provider bulk paths avoid per-statement parsing and round-trips. The classes use
-BenchmarkDotNet's `RunStrategy.Monitoring` with an `[IterationSetup]` that truncates the table, so
-each iteration is exactly one full bulk load against an empty table (no primary-key clashes). They
-need a real server and will throw in `[GlobalSetup]` if the env var is unset.
+The displayed `Ratio` column is therefore "vs Dapper", and `GaroaBulk` should be a small fraction of
+it — the provider bulk paths avoid per-statement parsing and per-row round-trips. The CI regression
+gate is stricter: it compares `GaroaBulk` against `NaiveInsert` (the best hand-written approach),
+computed straight from the raw means independently of the BenchmarkDotNet `[Baseline]`. Each class
+pins `invocationCount: 1` with an `[IterationSetup]` that truncates the table, so each iteration is
+exactly one full bulk load against an empty table (no primary-key clashes). They need a real server
+and will throw in `[GlobalSetup]` if the env var is unset.
 
 ## Running locally
 

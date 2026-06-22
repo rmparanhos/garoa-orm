@@ -1,18 +1,26 @@
 using System.Text;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
+using Dapper;
 using Garoa;
 using Npgsql;
 
 namespace Garoa.Benchmarks;
 
 /// <summary>
-/// Bulk insert over a real PostgreSQL connection: Garoa's streaming binary <c>COPY</c>
-/// (<c>GaroaBulk</c>) vs the naive multi-row parameterised <c>INSERT</c> a developer would
-/// otherwise hand-write (<c>NaiveInsert</c>, the <see cref="BenchmarkAttribute.Baseline"/>). Both
-/// write the same rows to the same table, so the reported <c>Ratio</c> (GaroaBulk / NaiveInsert) is
-/// what we track — and it should be well below 1, since COPY avoids per-statement parsing and
-/// round-trips.
+/// Bulk insert over a real PostgreSQL connection, comparing three ways to write the same rows to
+/// the same table (Dapper is the <see cref="BenchmarkAttribute.Baseline"/>, matching the rest of
+/// the suite):
+/// <list type="bullet">
+///   <item><c>Dapper</c> — idiomatic <c>Execute(sql, rows)</c>; Dapper has no bulk path, so this is
+///   one server round-trip per row.</item>
+///   <item><c>NaiveInsert</c> — the naive multi-row parameterised <c>INSERT</c> a developer would
+///   otherwise hand-write (chunked).</item>
+///   <item><c>GaroaBulk</c> — Garoa's streaming binary <c>COPY</c>.</item>
+/// </list>
+/// The reported <c>Ratio</c> is therefore "vs Dapper"; <c>GaroaBulk</c> should be a small fraction
+/// of it. The CI regression gate separately tracks <c>GaroaBulk</c> against <c>NaiveInsert</c> (the
+/// tougher reference), computed straight from the raw means.
 /// <para>
 /// Pinned to one invocation per iteration (<c>invocationCount: 1</c>) with an
 /// <c>[IterationSetup]</c> that truncates the table — so each measured iteration is exactly one
@@ -28,6 +36,10 @@ public class PostgresBulkInsertBenchmarks
     // PostgreSQL caps a statement at 65535 parameters; chunking the naive INSERT keeps it well
     // under that and mirrors what real chunking helpers do.
     private const int ChunkSize = 1000;
+
+    // Single-row INSERT used by the Dapper baseline; @-parameters bind to BenchBulkRow's members.
+    private const string InsertSql =
+        "INSERT INTO bench_bulk (id, customer, amount, quantity, status) VALUES (@Id, @Customer, @Amount, @Quantity, @Status)";
 
     private NpgsqlConnection _connection = null!;
     private BenchBulkRow[] _rows = null!;
@@ -69,7 +81,11 @@ public class PostgresBulkInsertBenchmarks
     [IterationSetup]
     public void ResetTable() => GaroaConnectionExtensions.Execute(_connection, "TRUNCATE bench_bulk");
 
+    // Idiomatic Dapper "bulk" insert: Execute with the row sequence runs the INSERT once per row.
     [Benchmark(Baseline = true)]
+    public int Dapper() => SqlMapper.Execute(_connection, InsertSql, _rows);
+
+    [Benchmark]
     public void NaiveInsert()
     {
         for (int offset = 0; offset < _rows.Length; offset += ChunkSize)
