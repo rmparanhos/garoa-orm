@@ -17,11 +17,13 @@ public static class MySqlBulkInsertExtensions
     /// <param name="table">Target table name.</param>
     /// <param name="rows">The rows to insert; streamed one at a time, never fully materialised.</param>
     /// <param name="columns">Columns to write; when null, all readable members of <typeparamref name="T"/> are used.</param>
+    /// <param name="commandTimeout">Timeout in seconds for the bulk-copy operation; when null, falls back to <see cref="GaroaDefaults.CommandTimeoutSeconds"/>.</param>
     public static long BulkInsert<T>(
         this MySqlConnection connection,
         string table,
         IEnumerable<T> rows,
-        IReadOnlyList<string>? columns = null)
+        IReadOnlyList<string>? columns = null,
+        int? commandTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(rows);
@@ -33,7 +35,7 @@ public static class MySqlBulkInsertExtensions
 
         try
         {
-            MySqlBulkCopy bulkCopy = CreateBulkCopy(connection, table, set);
+            MySqlBulkCopy bulkCopy = CreateBulkCopy(connection, table, set, commandTimeout);
             using var reader = new ObjectDataReader<T>(rows, set);
             MySqlBulkCopyResult result = bulkCopy.WriteToServer(reader);
             return result.RowsInserted;
@@ -51,6 +53,7 @@ public static class MySqlBulkInsertExtensions
         string table,
         IEnumerable<T> rows,
         IReadOnlyList<string>? columns = null,
+        int? commandTimeout = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -63,7 +66,7 @@ public static class MySqlBulkInsertExtensions
 
         try
         {
-            MySqlBulkCopy bulkCopy = CreateBulkCopy(connection, table, set);
+            MySqlBulkCopy bulkCopy = CreateBulkCopy(connection, table, set, commandTimeout);
             using var reader = new ObjectDataReader<T>(rows, set);
             MySqlBulkCopyResult result = await bulkCopy
                 .WriteToServerAsync(reader, cancellationToken)
@@ -77,12 +80,17 @@ public static class MySqlBulkInsertExtensions
         }
     }
 
-    private static MySqlBulkCopy CreateBulkCopy<T>(MySqlConnection connection, string table, BulkColumnSet<T> set)
+    private static MySqlBulkCopy CreateBulkCopy<T>(MySqlConnection connection, string table, BulkColumnSet<T> set, int? commandTimeout)
     {
         if (string.IsNullOrWhiteSpace(table))
             throw new ArgumentException("Table name must not be empty.", nameof(table));
 
         var bulkCopy = new MySqlBulkCopy(connection) { DestinationTableName = table };
+
+        // Per-call timeout wins; otherwise the global default (0 seconds = no timeout).
+        int? effectiveTimeout = GaroaDefaults.ResolveCommandTimeout(commandTimeout);
+        if (effectiveTimeout.HasValue)
+            bulkCopy.BulkCopyTimeout = effectiveTimeout.Value;
 
         // Map source ordinal -> destination column by name so column order is explicit and
         // independent of the table's physical layout.

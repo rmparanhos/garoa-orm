@@ -78,7 +78,11 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
 
 - [x] Correct pool management — no connection leaks (open-if-closed / close-what-we-opened on
   every operation, including bulk).
-- [ ] Timeout configurable per-operation and globally.
+- [x] Timeout configurable per-operation and globally. Every `Query`/`Execute`/`BulkInsert`
+  overload takes a `commandTimeout` (seconds); when omitted it falls back to the process-wide
+  `GaroaDefaults.CommandTimeoutSeconds` (null = the provider default, 0 = no timeout). The default
+  flows to ADO.NET commands (`Query`/`Execute`), the PostgreSQL COPY writer
+  (`NpgsqlBinaryImporter.Timeout`) and the MySQL bulk copy (`MySqlBulkCopy.BulkCopyTimeout`).
 - [ ] Avoid the Dapper MySQL issue where connections stay in an invalid state after a
   timeout.
 

@@ -166,8 +166,10 @@ public static class GaroaConnectionExtensions
         DbCommand command = connection.CreateCommand();
         command.CommandText = sql;
 
-        if (commandTimeout.HasValue)
-            command.CommandTimeout = commandTimeout.Value;
+        // Per-call timeout wins; otherwise fall back to the global default (null = provider default).
+        int? effectiveTimeout = GaroaDefaults.ResolveCommandTimeout(commandTimeout);
+        if (effectiveTimeout.HasValue)
+            command.CommandTimeout = effectiveTimeout.Value;
         if (commandType.HasValue)
             command.CommandType = commandType.Value;
 

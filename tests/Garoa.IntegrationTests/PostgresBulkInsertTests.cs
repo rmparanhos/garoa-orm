@@ -44,7 +44,8 @@ public class PostgresBulkInsertTests
             ManagerId = i == 1 ? null : 1,
         });
 
-        ulong written = await db.BulkInsertAsync("people", rows);
+        // Exercises the COPY timeout path (NpgsqlBinaryImporter.Timeout).
+        ulong written = await db.BulkInsertAsync("people", rows, commandTimeout: 30);
         Assert.Equal(1000UL, written);
 
         List<long> count = db.Query<long>("SELECT count(*) FROM people;");
@@ -72,7 +73,7 @@ public class PostgresBulkInsertTests
         };
 
         // Let the database assign id via serial: only write name + birth_date.
-        ulong written = db.BulkInsert("people", rows, new[] { "name", "birth_date" });
+        ulong written = db.BulkInsert("people", rows, new[] { "name", "birth_date" }, commandTimeout: 30);
         Assert.Equal(2UL, written);
 
         List<string> names = db.Query<string>("SELECT name FROM people ORDER BY id;");

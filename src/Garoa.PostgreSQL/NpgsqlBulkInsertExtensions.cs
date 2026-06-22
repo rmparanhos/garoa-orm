@@ -17,11 +17,13 @@ public static class NpgsqlBulkInsertExtensions
     /// <param name="table">Target table, used verbatim (qualify/quote it yourself if needed, e.g. <c>public."People"</c>).</param>
     /// <param name="rows">The rows to insert; streamed one at a time, never fully materialised.</param>
     /// <param name="columns">Columns to write; when null, all readable members of <typeparamref name="T"/> are used.</param>
+    /// <param name="commandTimeout">Timeout in seconds for the COPY operation; when null, falls back to <see cref="GaroaDefaults.CommandTimeoutSeconds"/>.</param>
     public static ulong BulkInsert<T>(
         this NpgsqlConnection connection,
         string table,
         IEnumerable<T> rows,
-        IReadOnlyList<string>? columns = null)
+        IReadOnlyList<string>? columns = null,
+        int? commandTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(rows);
@@ -34,6 +36,7 @@ public static class NpgsqlBulkInsertExtensions
         try
         {
             using NpgsqlBinaryImporter writer = connection.BeginBinaryImport(BuildCopyCommand(table, set));
+            ApplyTimeout(writer, commandTimeout);
             var buffer = new object?[set.Count];
             ulong written = 0;
 
@@ -61,6 +64,7 @@ public static class NpgsqlBulkInsertExtensions
         string table,
         IEnumerable<T> rows,
         IReadOnlyList<string>? columns = null,
+        int? commandTimeout = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -79,6 +83,7 @@ public static class NpgsqlBulkInsertExtensions
 
             await using (writer.ConfigureAwait(false))
             {
+                ApplyTimeout(writer, commandTimeout);
                 var buffer = new object?[set.Count];
                 ulong written = 0;
 
@@ -108,6 +113,15 @@ public static class NpgsqlBulkInsertExtensions
 
         string columnList = string.Join(", ", set.ColumnNames.Select(Quote));
         return $"COPY {table} ({columnList}) FROM STDIN (FORMAT BINARY)";
+    }
+
+    // Applies the per-call timeout, or the global default, to the COPY writer. Npgsql's importer
+    // exposes a set-only TimeSpan Timeout; a value of 0 seconds means "no timeout" (TimeSpan.Zero).
+    private static void ApplyTimeout(NpgsqlBinaryImporter writer, int? commandTimeout)
+    {
+        int? effectiveTimeout = GaroaDefaults.ResolveCommandTimeout(commandTimeout);
+        if (effectiveTimeout.HasValue)
+            writer.Timeout = TimeSpan.FromSeconds(effectiveTimeout.Value);
     }
 
     private static void WriteRow(NpgsqlBinaryImporter writer, object?[] buffer)

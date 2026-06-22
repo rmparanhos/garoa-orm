@@ -45,7 +45,8 @@ public class MySqlBulkInsertTests
             ManagerId = i == 1 ? null : 1,
         });
 
-        long written = await db.BulkInsertAsync("people", rows);
+        // Exercises the bulk-copy timeout path (MySqlBulkCopy.BulkCopyTimeout).
+        long written = await db.BulkInsertAsync("people", rows, commandTimeout: 30);
         Assert.Equal(1000, written);
 
         List<long> count = db.Query<long>("SELECT count(*) FROM people;");

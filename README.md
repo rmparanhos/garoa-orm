@@ -91,6 +91,23 @@ await pg.BulkInsertAsync("people", people, columns: new[] { "name", "birth_date"
 > or the `columns` argument. For a snake_case table, annotate members with `[Column("birth_date")]`
 > or pass explicit `columns`.
 
+### Timeouts
+
+Every `Query`/`Execute`/`BulkInsert` overload takes a `commandTimeout` (in seconds) for that one
+call. To set it everywhere, configure the process-wide default once at startup:
+
+```csharp
+// Global default for any call that doesn't pass its own commandTimeout.
+GaroaDefaults.CommandTimeoutSeconds = 60;   // null = provider default (~30s); 0 = no timeout
+
+// Per-call override always wins over the global default.
+List<Person> slow = connection.Query<Person>(reportSql, commandTimeout: 300);
+ulong written = await pg.BulkInsertAsync("people", people, commandTimeout: 600);
+```
+
+The timeout flows to the underlying ADO.NET command for `Query`/`Execute`, to the PostgreSQL COPY
+writer for `BulkInsert`, and to `MySqlBulkCopy.BulkCopyTimeout` for the MySQL provider.
+
 ### Mapping rules
 
 - Column-to-member matching is case-insensitive and underscore-insensitive: `birth_date`
