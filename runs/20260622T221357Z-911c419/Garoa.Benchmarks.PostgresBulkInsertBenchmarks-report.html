@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Garoa.Benchmarks.PostgresBulkInsertBenchmarks-20260622-221120</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat)
+AMD EPYC 9V74, 1 CPU, 4 logical and 2 physical cores
+.NET SDK 10.0.301
+  [Host]     : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+  Job-SDEXJD : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+</code></pre>
+<pre><code>Runtime=.NET 8.0  InvocationCount=1  IterationCount=10  
+UnrollFactor=1  WarmupCount=2  
+</code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>Rows</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>NaiveInsert</td><td>1000</td><td>9.985 ms</td><td>0.4885 ms</td><td>0.2555 ms</td><td>1.00</td><td>0.03</td><td>1844.79 KB</td><td>1.00</td>
+</tr><tr><td>GaroaBulk</td><td>1000</td><td>6.743 ms</td><td>0.3229 ms</td><td>0.1921 ms</td><td>0.68</td><td>0.02</td><td>73.27 KB</td><td>0.04</td>
+</tr><tr><td>NaiveInsert</td><td>10000</td><td>113.719 ms</td><td>25.7792 ms</td><td>17.0513 ms</td><td>1.02</td><td>0.22</td><td>18438.98 KB</td><td>1.00</td>
+</tr><tr><td>GaroaBulk</td><td>10000</td><td>37.665 ms</td><td>13.9174 ms</td><td>7.2790 ms</td><td>0.34</td><td>0.08</td><td>708.62 KB</td><td>0.04</td>
+</tr></tbody></table>
+</body>
+</html>
