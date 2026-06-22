@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Garoa.Benchmarks.PostgresQueryBenchmarks-20260622-163751</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat)
+AMD EPYC 9V74, 1 CPU, 4 logical and 2 physical cores
+.NET SDK 10.0.301
+  [Host]     : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+  Job-HBIJXU : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+</code></pre>
+<pre><code>Runtime=.NET 8.0  IterationCount=8  LaunchCount=1  
+WarmupCount=3  
+</code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>Rows</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>Gen0</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Dapper</td><td>1</td><td>201.2 &mu;s</td><td>2.23 &mu;s</td><td>0.99 &mu;s</td><td>1.00</td><td>-</td><td>969 B</td><td>1.00</td>
+</tr><tr><td>Garoa</td><td>1</td><td>199.6 &mu;s</td><td>1.65 &mu;s</td><td>0.73 &mu;s</td><td>0.99</td><td>-</td><td>681 B</td><td>0.70</td>
+</tr><tr><td>Dapper</td><td>100</td><td>278.6 &mu;s</td><td>3.82 &mu;s</td><td>1.70 &mu;s</td><td>1.00</td><td>-</td><td>24057 B</td><td>1.00</td>
+</tr><tr><td>Garoa</td><td>100</td><td>302.8 &mu;s</td><td>3.58 &mu;s</td><td>1.87 &mu;s</td><td>1.09</td><td>-</td><td>16641 B</td><td>0.69</td>
+</tr><tr><td>Dapper</td><td>1000</td><td>799.9 &mu;s</td><td>9.68 &mu;s</td><td>4.30 &mu;s</td><td>1.00</td><td>1.9531</td><td>229376 B</td><td>1.00</td>
+</tr><tr><td>Garoa</td><td>1000</td><td>971.2 &mu;s</td><td>9.58 &mu;s</td><td>5.01 &mu;s</td><td>1.21</td><td>-</td><td>157066 B</td><td>0.68</td>
+</tr></tbody></table>
+</body>
+</html>
