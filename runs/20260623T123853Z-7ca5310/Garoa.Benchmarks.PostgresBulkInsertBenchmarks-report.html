@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Garoa.Benchmarks.PostgresBulkInsertBenchmarks-20260623-123449</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat)
+AMD EPYC 9V45, 1 CPU, 4 logical and 2 physical cores
+.NET SDK 10.0.301
+  [Host]     : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX-512F+CD+BW+DQ+VL+VBMI
+  Job-OQMTER : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX-512F+CD+BW+DQ+VL+VBMI
+</code></pre>
+<pre><code>Runtime=.NET 8.0  InvocationCount=1  IterationCount=10  
+UnrollFactor=1  WarmupCount=2  
+</code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>Rows</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Dapper</td><td>1000</td><td>8.226 ms</td><td>6.094 ms</td><td>3.627 ms</td><td>1.15</td><td>0.63</td><td>2655.29 KB</td><td>1.000</td>
+</tr><tr><td>ManualCopy</td><td>1000</td><td>4.367 ms</td><td>2.253 ms</td><td>1.178 ms</td><td>0.61</td><td>0.26</td><td>2.73 KB</td><td>0.001</td>
+</tr><tr><td>GaroaBulk</td><td>1000</td><td>6.299 ms</td><td>3.149 ms</td><td>1.874 ms</td><td>0.88</td><td>0.39</td><td>73.88 KB</td><td>0.028</td>
+</tr><tr><td>Dapper</td><td>10000</td><td>157.417 ms</td><td>135.561 ms</td><td>89.665 ms</td><td>1.47</td><td>1.35</td><td>26543.52 KB</td><td>1.000</td>
+</tr><tr><td>ManualCopy</td><td>10000</td><td>28.024 ms</td><td>26.636 ms</td><td>15.851 ms</td><td>0.26</td><td>0.24</td><td>4.32 KB</td><td>0.000</td>
+</tr><tr><td>GaroaBulk</td><td>10000</td><td>31.195 ms</td><td>33.109 ms</td><td>17.317 ms</td><td>0.29</td><td>0.26</td><td>707.4 KB</td><td>0.027</td>
+</tr></tbody></table>
+</body>
+</html>
