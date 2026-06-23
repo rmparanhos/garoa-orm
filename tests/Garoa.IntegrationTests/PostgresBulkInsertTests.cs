@@ -79,4 +79,40 @@ public class PostgresBulkInsertTests
         List<string> names = db.Query<string>("SELECT name FROM people ORDER BY id;");
         Assert.Equal(new[] { "Ada", "Alan" }, names);
     }
+
+    private enum Priority : short { Low = 1, High = 2 }
+
+    private sealed class Job
+    {
+        [Column("id")] public int Id { get; set; }
+        [Column("priority")] public Priority Priority { get; set; }
+        [Column("due")] public DateOnly? Due { get; set; }
+    }
+
+    [SkippableFact]
+    public void BulkInsert_writes_enum_as_numeric_and_handles_nullable_value_type()
+    {
+        using NpgsqlConnection db = Open();
+        db.Execute("DROP TABLE IF EXISTS jobs;");
+        db.Execute("CREATE TABLE jobs (id int PRIMARY KEY, priority smallint, due date);");
+
+        var rows = new[]
+        {
+            new Job { Id = 1, Priority = Priority.High, Due = new DateOnly(2030, 1, 1) },
+            new Job { Id = 2, Priority = Priority.Low, Due = null },
+        };
+
+        ulong written = db.BulkInsert("jobs", rows);
+        Assert.Equal(2UL, written);
+
+        // Enum is written as its numeric backing value (smallint), via the typed COPY writer.
+        List<short> priorities = db.Query<short>("SELECT priority FROM jobs ORDER BY id;");
+        Assert.Equal(new short[] { 2, 1 }, priorities);
+
+        // Nullable DateOnly round-trips, including the null.
+        List<Job> back = db.Query<Job>("SELECT id, priority, due FROM jobs ORDER BY id;");
+        Assert.Equal(Priority.High, back[0].Priority);
+        Assert.Equal(new DateOnly(2030, 1, 1), back[0].Due);
+        Assert.Null(back[1].Due);
+    }
 }

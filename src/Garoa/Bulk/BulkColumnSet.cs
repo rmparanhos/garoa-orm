@@ -48,7 +48,7 @@ internal sealed class BulkColumnSet<T>
 
     private static BulkColumnSet<T> Build(IReadOnlyList<string>? columns)
     {
-        (MemberInfo Member, string Column)[] selected = SelectMembers(columns);
+        (MemberInfo Member, string Column)[] selected = SelectColumns(columns);
         if (selected.Length == 0)
             throw new GaroaMappingException($"No bulk-insertable members found on '{typeof(T).FullName}'.");
 
@@ -78,7 +78,13 @@ internal sealed class BulkColumnSet<T>
         return new BulkColumnSet<T>(names, types, fill);
     }
 
-    private static (MemberInfo Member, string Column)[] SelectMembers(IReadOnlyList<string>? columns)
+    /// <summary>
+    /// The ordered (member, destination column) pairs this type bulk-inserts, applying the same
+    /// member discovery, <c>[Column]</c> resolution and explicit-column matching the runtime fill
+    /// uses. Exposed so provider writers (e.g. the PostgreSQL typed COPY writer) emit the exact same
+    /// columns without duplicating the selection rules.
+    /// </summary>
+    internal static (MemberInfo Member, string Column)[] SelectColumns(IReadOnlyList<string>? columns)
     {
         List<(MemberInfo Member, string Column)> all = DiscoverMembers();
 

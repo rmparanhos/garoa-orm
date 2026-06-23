@@ -88,8 +88,13 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
 
 ### Providers (v1)
 
-- [x] PostgreSQL (Npgsql) — bulk insert. Provider package: `Garoa.PostgreSQL`.
-- [x] MySQL (MySqlConnector) — bulk insert. Provider package: `Garoa.MySql`.
+- [x] PostgreSQL (Npgsql) — bulk insert. Provider package: `Garoa.PostgreSQL`. Rows are written
+  through a compiled, typed COPY writer (`NpgsqlCopyWriter<T>`) that calls `Write<T>` per column, so
+  value types are never boxed — bulk allocation drops from ~74 B/row to a near-constant few KB,
+  matching a hand-written COPY (the benchmark `ManualCopy` floor). Column selection is shared with
+  the runtime fill (`BulkColumnSet<T>.SelectColumns`) so both stay in sync.
+- [x] MySQL (MySqlConnector) — bulk insert. Provider package: `Garoa.MySql`. (Boxing is inherent
+  here: `MySqlBulkCopy` consumes a `DbDataReader`, whose `GetValue` returns `object`.)
 
 ---
 

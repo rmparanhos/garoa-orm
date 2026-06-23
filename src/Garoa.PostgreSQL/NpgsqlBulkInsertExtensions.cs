@@ -1,5 +1,4 @@
 using System.Data;
-using Garoa.Bulk;
 using Npgsql;
 
 namespace Garoa;
@@ -8,7 +7,8 @@ namespace Garoa;
 /// Streaming bulk insert for PostgreSQL, built on Npgsql's binary COPY protocol
 /// (<see cref="NpgsqlBinaryImporter"/>). Rows are written one at a time straight to the server,
 /// so a giant <c>INSERT</c> string is never built and the source sequence is never materialised.
-/// Requires only normal <c>INSERT</c> privilege on the target table.
+/// Each row is written through a compiled, typed writer (<see cref="NpgsqlCopyWriter{T}"/>), so
+/// value-type columns never get boxed. Requires only normal <c>INSERT</c> privilege on the target table.
 /// </summary>
 public static class NpgsqlBulkInsertExtensions
 {
@@ -28,23 +28,21 @@ public static class NpgsqlBulkInsertExtensions
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(rows);
 
-        BulkColumnSet<T> set = BulkColumnSet<T>.Get(columns);
+        NpgsqlCopyWriter<T> rowWriter = NpgsqlCopyWriter<T>.Get(columns);
         bool wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
             connection.Open();
 
         try
         {
-            using NpgsqlBinaryImporter writer = connection.BeginBinaryImport(BuildCopyCommand(table, set));
+            using NpgsqlBinaryImporter writer = connection.BeginBinaryImport(BuildCopyCommand(table, rowWriter.ColumnNames));
             ApplyTimeout(writer, commandTimeout);
-            var buffer = new object?[set.Count];
             ulong written = 0;
 
             foreach (T row in rows)
             {
-                set.Fill(row, buffer);
                 writer.StartRow();
-                WriteRow(writer, buffer);
+                rowWriter.WriteRow(writer, row);
                 written++;
             }
 
@@ -70,7 +68,7 @@ public static class NpgsqlBulkInsertExtensions
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(rows);
 
-        BulkColumnSet<T> set = BulkColumnSet<T>.Get(columns);
+        NpgsqlCopyWriter<T> rowWriter = NpgsqlCopyWriter<T>.Get(columns);
         bool wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -78,20 +76,20 @@ public static class NpgsqlBulkInsertExtensions
         try
         {
             NpgsqlBinaryImporter writer = await connection
-                .BeginBinaryImportAsync(BuildCopyCommand(table, set), cancellationToken)
+                .BeginBinaryImportAsync(BuildCopyCommand(table, rowWriter.ColumnNames), cancellationToken)
                 .ConfigureAwait(false);
 
             await using (writer.ConfigureAwait(false))
             {
                 ApplyTimeout(writer, commandTimeout);
-                var buffer = new object?[set.Count];
                 ulong written = 0;
 
                 foreach (T row in rows)
                 {
-                    set.Fill(row, buffer);
+                    // Row framing is awaited (the frequent I/O points); the typed per-value writes
+                    // buffer in memory and only flush synchronously at buffer boundaries.
                     await writer.StartRowAsync(cancellationToken).ConfigureAwait(false);
-                    await WriteRowAsync(writer, buffer, cancellationToken).ConfigureAwait(false);
+                    rowWriter.WriteRow(writer, row);
                     written++;
                 }
 
@@ -106,12 +104,12 @@ public static class NpgsqlBulkInsertExtensions
         }
     }
 
-    private static string BuildCopyCommand<T>(string table, BulkColumnSet<T> set)
+    private static string BuildCopyCommand(string table, IReadOnlyList<string> columnNames)
     {
         if (string.IsNullOrWhiteSpace(table))
             throw new ArgumentException("Table name must not be empty.", nameof(table));
 
-        string columnList = string.Join(", ", set.ColumnNames.Select(Quote));
+        string columnList = string.Join(", ", columnNames.Select(Quote));
         return $"COPY {table} ({columnList}) FROM STDIN (FORMAT BINARY)";
     }
 
@@ -122,28 +120,6 @@ public static class NpgsqlBulkInsertExtensions
         int? effectiveTimeout = GaroaDefaults.ResolveCommandTimeout(commandTimeout);
         if (effectiveTimeout.HasValue)
             writer.Timeout = TimeSpan.FromSeconds(effectiveTimeout.Value);
-    }
-
-    private static void WriteRow(NpgsqlBinaryImporter writer, object?[] buffer)
-    {
-        foreach (object? value in buffer)
-        {
-            if (value is null)
-                writer.WriteNull();
-            else
-                writer.Write(value);
-        }
-    }
-
-    private static async ValueTask WriteRowAsync(NpgsqlBinaryImporter writer, object?[] buffer, CancellationToken ct)
-    {
-        foreach (object? value in buffer)
-        {
-            if (value is null)
-                await writer.WriteNullAsync(ct).ConfigureAwait(false);
-            else
-                await writer.WriteAsync(value, ct).ConfigureAwait(false);
-        }
     }
 
     private static string Quote(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
