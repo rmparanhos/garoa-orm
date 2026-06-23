@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
@@ -119,6 +120,30 @@ public class MySqlBulkInsertBenchmarks
 
             SqlMapper.Execute(_connection, sql.ToString(), parameters);
         }
+    }
+
+    // The bulk floor for MySQL: MySqlBulkCopy fed by a DataTable — the idiomatic raw usage, since
+    // MySqlBulkCopy has no streaming-object overload of its own. GaroaBulk wraps the same engine but
+    // streams rows through an ObjectDataReader, so GaroaBulk vs ManualBulkCopy should be close in
+    // time while GaroaBulk allocates far less (the DataTable materialises every row up front).
+    [Benchmark]
+    public long ManualBulkCopy()
+    {
+        var table = new DataTable();
+        table.Columns.Add("id", typeof(long));
+        table.Columns.Add("customer", typeof(string));
+        table.Columns.Add("amount", typeof(double));
+        table.Columns.Add("quantity", typeof(long));
+        table.Columns.Add("status", typeof(string));
+
+        foreach (BenchBulkRow r in _rows)
+            table.Rows.Add(r.Id, r.Customer, r.Amount, r.Quantity, r.Status);
+
+        var bulkCopy = new MySqlBulkCopy(_connection) { DestinationTableName = "bench_bulk" };
+        for (int i = 0; i < table.Columns.Count; i++)
+            bulkCopy.ColumnMappings.Add(new MySqlBulkCopyColumnMapping(i, table.Columns[i].ColumnName));
+
+        return bulkCopy.WriteToServer(table).RowsInserted;
     }
 
     [Benchmark]

@@ -110,6 +110,29 @@ public class PostgresBulkInsertBenchmarks
         }
     }
 
+    // The bulk floor: hand-written streaming binary COPY with typed Write<T> (no boxing, no
+    // object[] buffer). This is what GaroaBulk wraps, so GaroaBulk vs ManualCopy exposes the cost
+    // of Garoa's per-row buffer + boxing. (You cannot do COPY FROM STDIN through Dapper's Execute —
+    // it needs this Npgsql import API.)
+    [Benchmark]
+    public void ManualCopy()
+    {
+        using NpgsqlBinaryImporter writer = _connection.BeginBinaryImport(
+            "COPY bench_bulk (id, customer, amount, quantity, status) FROM STDIN (FORMAT BINARY)");
+
+        foreach (BenchBulkRow r in _rows)
+        {
+            writer.StartRow();
+            writer.Write(r.Id);
+            writer.Write(r.Customer!);
+            writer.Write(r.Amount);
+            writer.Write(r.Quantity);
+            writer.Write(r.Status!);
+        }
+
+        writer.Complete();
+    }
+
     [Benchmark]
     public ulong GaroaBulk() => _connection.BulkInsert("bench_bulk", _rows);
 }

@@ -38,21 +38,23 @@ overhead over hand-written code (if they tie, the generator is **at the floor**)
 | `PostgresBulkInsertBenchmarks` | PostgreSQL  | `GAROA_PG_CONN`    |
 | `MySqlBulkInsertBenchmarks`    | MySQL       | `GAROA_MYSQL_CONN` (with `AllowLoadLocalInfile=True`) |
 
-These measure writing `N ∈ {1 000, 10 000}` rows two ways (Dapper is the `[Baseline]`, as in the
+These measure writing `N ∈ {1 000, 10 000}` rows three ways (Dapper is the `[Baseline]`, as in the
 read-mapping benchmarks):
 
-| Method      | What it measures                                                                  |
-| ----------- | --------------------------------------------------------------------------------- |
-| `Dapper`    | A chunked multi-row `INSERT ... VALUES (...),(...)` executed through Dapper's `Execute` (baseline). Dapper has no bulk API, so this hand-written multi-row statement is the best a Dapper user can do. |
-| `GaroaBulk` | Garoa's streaming `BulkInsert` — PostgreSQL binary `COPY` / MySQL `MySqlBulkCopy`. |
+| Method                       | What it measures                                                                  |
+| ---------------------------- | --------------------------------------------------------------------------------- |
+| `Dapper`                     | A chunked multi-row `INSERT ... VALUES (...),(...)` executed through Dapper's `Execute` (baseline). Dapper has no bulk API, so this hand-written multi-row statement is the best a Dapper user can do. |
+| `ManualCopy` / `ManualBulkCopy` | The **bulk floor**: hand-written raw provider bulk load — PostgreSQL streaming binary `COPY` with typed `Write<T>`, MySQL `MySqlBulkCopy` fed by a `DataTable`. This is the engine `GaroaBulk` wraps. |
+| `GaroaBulk`                  | Garoa's streaming `BulkInsert` — PostgreSQL binary `COPY` / MySQL `MySqlBulkCopy`. |
 
-The fair comparison here is **`GaroaBulk` vs a competent Dapper multi-row insert**, not vs a per-row
-`Execute` loop. A row-by-row loop (one round-trip and one commit per row) is a common anti-pattern
-that is ~50–150× slower than either approach, but that gap is about row-by-row execution, not the
-library — so it is deliberately *not* the baseline. The `Ratio` column is therefore "vs the Dapper
-multi-row INSERT", and `GaroaBulk` should sit comfortably below 1: `COPY` / `MySqlBulkCopy` skip
-per-statement SQL parsing, stream the rows, and never build a giant statement (hence far fewer
-allocations). The CI regression gate tracks `GaroaBulk` against this baseline.
+Two comparisons matter. **`GaroaBulk` vs `Dapper`** (the `Ratio` column) shows the gain of a real
+bulk path over the best non-bulk SQL a Dapper user can write — it should sit well below 1, since
+`COPY`/`MySqlBulkCopy` skip per-statement parsing and never build a giant statement. **`GaroaBulk`
+vs `ManualCopy`/`ManualBulkCopy`** is the floor check: it isolates the cost of Garoa's per-row
+buffer + boxing over hand-written raw bulk (on MySQL, watch the allocation column — the `DataTable`
+floor materialises every row, while `GaroaBulk` streams). Note you **cannot** run `COPY FROM STDIN`
+through Dapper's `Execute`; it requires Npgsql's import API, which is exactly what `GaroaBulk` wraps.
+The CI regression gate tracks `GaroaBulk` against the `Dapper` baseline.
 
 Each class pins `invocationCount: 1` with an `[IterationSetup]` that truncates the table, so each
 iteration is exactly one full bulk load against an empty table (no primary-key clashes). They need a
