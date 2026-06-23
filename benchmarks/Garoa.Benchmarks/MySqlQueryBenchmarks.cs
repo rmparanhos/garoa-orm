@@ -81,6 +81,10 @@ public class MySqlQueryBenchmarks
     [Benchmark(Baseline = true)]
     public List<BenchOrder> Dapper() => SqlMapper.Query<BenchOrder>(_connection, Sql).AsList();
 
+    // Hand-written mapper — the performance floor an ORM cannot beat for this List<T> contract.
+    [Benchmark]
+    public List<BenchOrder> Manual() => ManualMapper.Read(_connection, Sql);
+
     // Runtime expression-tree mapper (BenchOrder is not [GaroaMapped]).
     [Benchmark]
     public List<BenchOrder> Garoa() => GaroaConnectionExtensions.Query<BenchOrder>(_connection, Sql);

@@ -1,3 +1,5 @@
+using System.Data.Common;
+
 namespace Garoa.Benchmarks;
 
 // Two identically-shaped POCOs so the benchmark can compare the two Garoa mapping paths over the
@@ -54,5 +56,36 @@ public sealed class BenchBulkRow
         }
 
         return rows;
+    }
+}
+
+// The hand-written "floor": maps the 5-column row to BenchOrder with constant ordinals and typed
+// getters, mirroring exactly what the source generator emits inline
+// (reader.IsDBNull(i) ? default : reader.GetX(i) per column). Comparing the Manual benchmark to
+// GaroaGenerated isolates the framework's per-row machinery from the raw reader work: if they tie,
+// the generated mapper is at the floor; the Manual-vs-Dapper ratio shows how much of any gap is the
+// driver itself rather than Garoa.
+internal static class ManualMapper
+{
+    public static List<BenchOrder> Read(DbConnection connection, string sql)
+    {
+        using DbCommand command = connection.CreateCommand();
+        command.CommandText = sql;
+
+        using DbDataReader reader = command.ExecuteReader();
+        var results = new List<BenchOrder>();
+        while (reader.Read())
+        {
+            results.Add(new BenchOrder
+            {
+                Id = reader.IsDBNull(0) ? default : reader.GetInt64(0),
+                Customer = reader.IsDBNull(1) ? default : reader.GetString(1),
+                Amount = reader.IsDBNull(2) ? default : reader.GetDouble(2),
+                Quantity = reader.IsDBNull(3) ? default : reader.GetInt64(3),
+                Status = reader.IsDBNull(4) ? default : reader.GetString(4),
+            });
+        }
+
+        return results;
     }
 }

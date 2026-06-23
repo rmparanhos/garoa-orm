@@ -15,17 +15,21 @@ ratio stable even when absolute timings drift.
 | `MySqlQueryBenchmarks`  | MySQL          | `GAROA_MYSQL_CONN` |
 
 All three classes benchmark the same scenario for `N ∈ {1, 100, 1000}` rows of a 5-column POCO,
-with three methods (Dapper is the `[Baseline]`):
+with four methods (Dapper is the `[Baseline]`):
 
 | Method           | What it measures                                                            |
 | ---------------- | --------------------------------------------------------------------------- |
 | `Dapper`         | Dapper's IL-based mapper (baseline).                                         |
+| `Manual`         | A **hand-written** mapper (constant ordinals + typed getters, `IsDBNull` per column). The performance floor an ORM cannot beat for the `List<T>` contract. |
 | `Garoa`          | Garoa's **runtime** expression-tree mapper (`BenchOrder`, not annotated).   |
 | `GaroaGenerated` | Garoa's **compile-time** source-generated mapper (`BenchOrderMapped`, `[GaroaMapped]`). |
 
-The `GaroaGenerated` row isolates the effect of the source generator: it uses typed reader getters
-instead of the generic `GetFieldValue<T>` dispatch, so comparing it against `Garoa` shows how much
-of the gap versus Dapper the generator closes.
+`Manual` mirrors exactly what the source generator emits inline, so two comparisons matter:
+`GaroaGenerated` vs `Manual` shows whether the generated mapper's per-row machinery adds any
+overhead over hand-written code (if they tie, the generator is **at the floor**), and `Manual` vs
+`Dapper` shows how much of any gap is the driver's own typed-getter cost rather than Garoa. The
+`GaroaGenerated` vs `Garoa` gap isolates the source generator's effect (typed getters vs the generic
+`GetFieldValue<T>` dispatch).
 
 ## Bulk-insert benchmarks
 

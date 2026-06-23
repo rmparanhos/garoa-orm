@@ -70,6 +70,11 @@ public class PostgresQueryBenchmarks
     [Benchmark(Baseline = true)]
     public List<BenchOrder> Dapper() => SqlMapper.Query<BenchOrder>(_connection, Sql).AsList();
 
+    // Hand-written mapper — the performance floor; on Npgsql this shows whether any Garoa gap is
+    // framework overhead or the driver's own typed-getter cost.
+    [Benchmark]
+    public List<BenchOrder> Manual() => ManualMapper.Read(_connection, Sql);
+
     // Runtime expression-tree mapper (BenchOrder is not [GaroaMapped]).
     [Benchmark]
     public List<BenchOrder> Garoa() => GaroaConnectionExtensions.Query<BenchOrder>(_connection, Sql);
