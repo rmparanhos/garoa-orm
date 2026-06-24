@@ -34,7 +34,8 @@ The v1 surface is intentionally tiny:
 | Bulk insert (high volume)| `BulkInsert<T>(IEnumerable<T>)` | Streaming, never materialised in memory |
 
 Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map,
-`QueryFirst`.
+`QueryFirst`. (The `QueryFirst`/`QuerySingle` family is now planned for a later version —
+see "Requested but not yet scheduled".)
 
 ### Result mapping
 
@@ -155,3 +156,31 @@ builder will build on.
 ## Requested but not yet scheduled
 
 (Capture ad-hoc requests here as they arrive, before they're slotted above.)
+
+### Planned post-v1 API additions
+
+The guiding rule: each is a **thin shell over the existing core** (mapper cache, `ParameterBinder`,
+connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that would need a
+*parallel* stack to what we already have is a bloat warning and gets questioned first.
+
+- [ ] **`QueryFirst` / `QueryFirstOrDefault` / `QuerySingle` / `QuerySingleOrDefault`** (sync + async).
+  Single-row reads — more ergonomic and more efficient than `Query<T>(...).FirstOrDefault()`, which
+  materialises the whole result set. One shared private core reused by all four (and their async
+  twins): read the first row, then branch on two flags — *throw vs `default(T)` when empty*, and
+  *whether to read a second row to reject `>1`*. `First*` uses `CommandBehavior.SingleRow` (the DB
+  stops after one row); `Single*` uses `SingleResult` so it can read the second. Reuses `Mapper<T>`
+  unchanged — **no new mapping code**. Low bloat risk; good first candidate.
+- [ ] **`IN` expansion** (`WHERE id IN @ids`) — scoped tightly so it never becomes a SQL rewriter.
+  Only expand a parameter whose value is a non-string `IEnumerable`: replace the `@name` token with
+  `(@name0, @name1, …)` and add one parameter per element in the binder. **Must** handle the
+  empty-list case (rewrite to a guaranteed-false predicate, never emit `IN ()`). Note: on PostgreSQL,
+  `= ANY(@ids)` with a native array parameter avoids expansion entirely; the generic text expansion
+  exists for cross-provider parity with Dapper migrants. Higher bloat risk than the above — keep the
+  token scan deliberately simple and documented as a small feature, not a parser.
+- [ ] **`Garoa.SqlServer` bulk insert** via `SqlBulkCopy` (`Microsoft.Data.SqlClient`) — desired,
+  deferred. Reuses the existing `ObjectDataReader<T>` + `BulkColumnSet` (same shape as the MySQL
+  provider), so it is mostly a new package plus integration tests. Dev and CI cost nothing: SQL Server
+  Developer Edition is free, and the official Docker image (`mcr.microsoft.com/mssql/server`) runs as
+  a CI service container exactly like the PG/MySQL ones. Production licensing is the consumer's
+  concern, not Garoa's. (`Query`/`Execute` already work against SQL Server today — only bulk is
+  provider-specific.)
