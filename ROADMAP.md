@@ -163,13 +163,20 @@ The guiding rule: each is a **thin shell over the existing core** (mapper cache,
 connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that would need a
 *parallel* stack to what we already have is a bloat warning and gets questioned first.
 
-- [ ] **`QueryFirst` / `QueryFirstOrDefault` / `QuerySingle` / `QuerySingleOrDefault`** (sync + async).
-  Single-row reads — more ergonomic and more efficient than `Query<T>(...).FirstOrDefault()`, which
-  materialises the whole result set. One shared private core reused by all four (and their async
-  twins): read the first row, then branch on two flags — *throw vs `default(T)` when empty*, and
-  *whether to read a second row to reject `>1`*. `First*` uses `CommandBehavior.SingleRow` (the DB
-  stops after one row); `Single*` uses `SingleResult` so it can read the second. Reuses `Mapper<T>`
-  unchanged — **no new mapping code**. Low bloat risk; good first candidate.
+- [ ] **`QueryFirst` / `QueryFirstOrDefault`** (sync + async) — the workhorse single-row reads
+  (`QueryFirstOrDefault` = "fetch by id → entity or `null`", the most common query of all). More
+  ergonomic and more efficient than `Query<T>(...).FirstOrDefault()`, which materialises the whole
+  result set. One shared private core: read the first row via `CommandBehavior.SingleRow` (the DB
+  streams a single row, no `List` built), then either return it or, when empty, *throw* (`First`) or
+  return `default(T)` (`FirstOrDefault`). Reuses `Mapper<T>` unchanged — **no new mapping code**. Low
+  bloat risk; first candidate. Note: `SingleRow` is a client-side hint, **not** `LIMIT 1`/`TOP 1` —
+  for the server to actually stop early, put the limit in your SQL. The method never injects it
+  (that would be SQL rewriting).
+- [ ] **`QuerySingle` / `QuerySingleOrDefault`** — deferred until asked. They assert *exactly one*
+  row, which is a narrower need and costs an extra fetch (they must read a **second** row via
+  `SingleResult` just to reject `>1`). For a PK lookup you already trust the cardinality, so
+  `QueryFirstOrDefault` is the cheaper, idiomatic choice; `Query<T>` already lets you check `.Count`
+  and throw your own way. Same shared core as the `First*` pair when it lands.
 - [ ] **`IN` expansion** (`WHERE id IN @ids`) — scoped tightly so it never becomes a SQL rewriter.
   Only expand a parameter whose value is a non-string `IEnumerable`: replace the `@name` token with
   `(@name0, @name1, …)` and add one parameter per element in the binder. **Must** handle the
