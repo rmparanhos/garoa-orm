@@ -45,6 +45,13 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
 - [x] Error messages identify the **correct** column by name + ordinal on a failed
   conversion (fixes the Dapper bug where the previous column was reported).
 - [x] Snake_case / `[Column]` matching, nullable + enum handling.
+- [x] **Compile-time mapper via source generator** (`[GaroaMapped]`). A Roslyn
+  `IIncrementalGenerator` (`Garoa.SourceGenerator`, shipped as an analyzer inside the
+  `Garoa` package) emits an `IGaroaRowMapper<T>` per annotated type — typed reader getters
+  (`GetInt64`, …) for BCL types, `GetFieldValue<T>` for provider-resolved ones (DateOnly).
+  No runtime `.Compile()`, Native-AOT/trimming friendly, same mapping semantics and
+  column-accurate errors. Opt-in; unmarked types keep using the runtime mapper. The runtime
+  prefers the generated mapper automatically (self-registered via a module initializer).
 
 ### Query / Execute
 
@@ -63,31 +70,45 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
 - [x] MySQL provider via `MySqlBulkCopy`.
 - Both require only normal INSERT privileges — no DDL / special grants. (MySQL also needs
   `AllowLoadLocalInfile=True` + server `local_infile=ON`, which `MySqlBulkCopy` relies on.)
-- [ ] Optional naming convention (e.g. auto snake_case) for the write side, so snake_case
-  tables don't require `[Column]`/explicit columns. (Today the write side emits member /
-  `[Column]` names verbatim.)
+- [x] Naming convention for the write side, so snake_case tables don't require `[Column]`/explicit
+  columns. `BulkInsert` derives column names via `GaroaDefaults.BulkNamingConvention`, defaulting to
+  `SnakeCase` (`BirthDate` → `birth_date`); `[Column]` and explicit `columns` always win. Set it to
+  `MemberName` to emit members verbatim. Applied in the shared `BulkColumnSet` selection, so both
+  the MySQL reader path and the PostgreSQL typed COPY writer honour it identically.
 
 ### Connection pool & timeout
 
 - [x] Correct pool management — no connection leaks (open-if-closed / close-what-we-opened on
   every operation, including bulk).
-- [ ] Timeout configurable per-operation and globally.
+- [x] Timeout configurable per-operation and globally. Every `Query`/`Execute`/`BulkInsert`
+  overload takes a `commandTimeout` (seconds); when omitted it falls back to the process-wide
+  `GaroaDefaults.CommandTimeoutSeconds` (null = the provider default, 0 = no timeout). The default
+  flows to ADO.NET commands (`Query`/`Execute`), the PostgreSQL COPY writer
+  (`NpgsqlBinaryImporter.Timeout`) and the MySQL bulk copy (`MySqlBulkCopy.BulkCopyTimeout`).
 - [ ] Avoid the Dapper MySQL issue where connections stay in an invalid state after a
   timeout.
 
 ### Providers (v1)
 
-- [x] PostgreSQL (Npgsql) — bulk insert. Provider package: `Garoa.PostgreSQL`.
-- [x] MySQL (MySqlConnector) — bulk insert. Provider package: `Garoa.MySql`.
+- [x] PostgreSQL (Npgsql) — bulk insert. Provider package: `Garoa.PostgreSQL`. Rows are written
+  through a compiled, typed COPY writer (`NpgsqlCopyWriter<T>`) that calls `Write<T>` per column, so
+  value types are never boxed — bulk allocation drops from ~74 B/row to a near-constant few KB,
+  matching a hand-written COPY (the benchmark `ManualCopy` floor). Column selection is shared with
+  the runtime fill (`BulkColumnSet<T>.SelectColumns`) so both stay in sync.
+- [x] MySQL (MySqlConnector) — bulk insert. Provider package: `Garoa.MySql`. (Boxing is inherent
+  here: `MySqlBulkCopy` consumes a `DbDataReader`, whose `GetValue` returns `object`.)
 
 ---
 
 ## Tooling, CI/CD & infrastructure
 
 - [x] Solution + project structure (`src/`, `tests/`, `Directory.Build.props`).
+- [x] Source generator project (`src/Garoa.SourceGenerator`, netstandard2.0 Roslyn analyzer),
+  referenced as an analyzer by the core and packed into the `Garoa` NuGet under
+  `analyzers/dotnet/cs`.
 - [x] Unit tests for the mapper (incl. DateOnly/TimeOnly, null handling, enums, wrong-
-  column error message) + end-to-end tests over SQLite + bulk core (`BulkColumnSet`,
-  `ObjectDataReader`).
+  column error message), the **generated** mapper (same coverage, asserts the generator ran),
+  end-to-end tests over SQLite + bulk core (`BulkColumnSet`, `ObjectDataReader`).
 - [x] Integration tests against live PostgreSQL + MySQL (`Garoa.IntegrationTests`, skipped
   unless `GAROA_PG_CONN` / `GAROA_MYSQL_CONN` are set).
 - [x] CI: build + unit test, plus an integration job with PostgreSQL + MySQL service
@@ -95,12 +116,22 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
 - [x] CI/CD: **publish the NuGet packages** (`Garoa`, `Garoa.PostgreSQL`, `Garoa.MySql`) on a
   `v*.*.*` tag (`.github/workflows/publish.yml`; requires the `NUGET_API_KEY` secret).
 - [x] Performance CI: relative benchmark Garoa vs Dapper using BenchmarkDotNet
-  `[Baseline]` (`benchmarks/Garoa.Benchmarks`). Runs on push to `main` (not on PRs).
-  Threshold set to **1.30x** (`check_threshold.py` + `GAROA_BENCH_THRESHOLD`). Results
-  published as an Actions artifact to track regressions.
+  `[Baseline]` (`benchmarks/Garoa.Benchmarks`). Runs on push to `main` **and on PRs
+  targeting `main`** (trigger added). Threshold set to **1.30x** (`check_threshold.py` +
+  `GAROA_BENCH_THRESHOLD`). Results published as an Actions artifact, committed to the
+  `benchmark-results` branch for long-term tracking, and posted as a PR comment.
   - Baseline numbers: Garoa is ~11% faster at 1 row, ~8–12% slower at 100–1000 rows, and
     allocates ~25–31% less memory than Dapper.
-  - [ ] Add a bulk-insert benchmark (Garoa providers vs naive multi-row INSERT).
+  - [x] Benchmark over real **PostgreSQL** and **MySQL** connections in addition to SQLite
+    (`PostgresQueryBenchmarks`, `MySqlQueryBenchmarks` — same service containers as
+    integration tests).
+  - [x] Add a bulk-insert benchmark (Garoa bulk vs Dapper multi-row INSERT):
+    `PostgresBulkInsertBenchmarks` / `MySqlBulkInsertBenchmarks` compare streaming `BulkInsert`
+    (COPY / `MySqlBulkCopy`, `GaroaBulk`) against a chunked multi-row `INSERT ... VALUES` executed
+    through Dapper (`Dapper`, the `[Baseline]`) for 1 000 / 10 000 rows. The baseline is a competent
+    multi-row insert, not a per-row `Execute` loop (an anti-pattern, deliberately not measured). The
+    CI gate `GAROA_BULK_THRESHOLD` holds `GaroaBulk` within `1.20x` of the Dapper baseline (expected
+    well under 1).
 
 ---
 
@@ -109,6 +140,15 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
 A "Drizzle in C#": a headless ORM with a query builder that reads like SQL but is
 type-safe. C# source generators give an edge over TypeScript here — stronger type
 safety with errors at compile time.
+
+The source-generator infrastructure landed first as the compile-time mapper
+(`[GaroaMapped]` → `IGaroaRowMapper<T>`); it's the foundation the type-safe query
+builder will build on.
+
+- [x] Closing the read-mapping gap with Dapper on large result sets: the benchmark now
+  measures a `[GaroaMapped]` type (`GaroaGenerated` row) alongside the runtime mapper,
+  isolating the source generator's effect (typed getters vs the generic `GetFieldValue<T>`
+  dispatch) across SQLite, PostgreSQL and MySQL.
 
 ---
 

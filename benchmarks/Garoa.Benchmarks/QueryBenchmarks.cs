@@ -60,17 +60,18 @@ public class QueryBenchmarks
 
     // Called statically because both libraries expose a Query<T> extension method.
     [Benchmark(Baseline = true)]
-    public List<Order> Dapper() => SqlMapper.Query<Order>(_connection, Sql).AsList();
+    public List<BenchOrder> Dapper() => SqlMapper.Query<BenchOrder>(_connection, Sql).AsList();
 
+    // Hand-written mapper — the performance floor an ORM cannot beat for this List<T> contract.
     [Benchmark]
-    public List<Order> Garoa() => GaroaConnectionExtensions.Query<Order>(_connection, Sql);
+    public List<BenchOrder> Manual() => ManualMapper.Read(_connection, Sql);
 
-    public sealed class Order
-    {
-        public long Id { get; set; }
-        public string? Customer { get; set; }
-        public double Amount { get; set; }
-        public long Quantity { get; set; }
-        public string? Status { get; set; }
-    }
+    // Runtime expression-tree mapper (BenchOrder is not [GaroaMapped]).
+    [Benchmark]
+    public List<BenchOrder> Garoa() => GaroaConnectionExtensions.Query<BenchOrder>(_connection, Sql);
+
+    // Compile-time source-generated mapper (BenchOrderMapped is [GaroaMapped]).
+    [Benchmark]
+    public List<BenchOrderMapped> GaroaGenerated() =>
+        GaroaConnectionExtensions.Query<BenchOrderMapped>(_connection, Sql);
 }

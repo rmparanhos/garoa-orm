@@ -56,4 +56,37 @@ internal static class TypeHelper
             if (c != skip) count++;
         return count;
     }
+
+    /// <summary>
+    /// Converts a PascalCase/camelCase member name to <c>snake_case</c>: an underscore is inserted
+    /// before each upper-case letter that starts a new word (i.e. follows a lower-case letter or
+    /// digit, or begins a word after an acronym run), then the whole string is lower-cased. So
+    /// <c>BirthDate</c> → <c>birth_date</c>, <c>ManagerId</c> → <c>manager_id</c>,
+    /// <c>HTTPStatus</c> → <c>http_status</c>.
+    /// </summary>
+    public static string ToSnakeCase(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return name;
+
+        var sb = new System.Text.StringBuilder(name.Length + 8);
+        for (int i = 0; i < name.Length; i++)
+        {
+            char c = name[i];
+            if (char.IsUpper(c))
+            {
+                bool prevIsWordChar = i > 0 && (char.IsLower(name[i - 1]) || char.IsDigit(name[i - 1]));
+                bool startsWordInAcronym = i > 0 && i + 1 < name.Length && char.IsLower(name[i + 1]);
+                if (prevIsWordChar || startsWordInAcronym)
+                    sb.Append('_');
+                sb.Append(char.ToLowerInvariant(c));
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+
+        return sb.ToString();
+    }
 }

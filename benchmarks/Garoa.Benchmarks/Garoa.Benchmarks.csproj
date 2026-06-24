@@ -16,10 +16,17 @@
     <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
+    <PackageReference Include="Npgsql" Version="8.0.5" />
+    <PackageReference Include="MySqlConnector" Version="2.3.7" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Garoa\Garoa.csproj" />
+    <!-- Provider packages supply the bulk-insert extensions exercised by the *BulkInsert* benchmarks. -->
+    <ProjectReference Include="..\..\src\Garoa.PostgreSQL\Garoa.PostgreSQL.csproj" />
+    <ProjectReference Include="..\..\src\Garoa.MySql\Garoa.MySql.csproj" />
+    <ProjectReference Include="..\..\src\Garoa.SourceGenerator\Garoa.SourceGenerator.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

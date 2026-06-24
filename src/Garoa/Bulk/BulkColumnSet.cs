@@ -43,12 +43,13 @@ internal sealed class BulkColumnSet<T>
     public static BulkColumnSet<T> Get(IReadOnlyList<string>? columns)
     {
         string key = columns is null ? "*" : string.Join("", columns);
-        return Cache.GetOrAdd(key, _ => Build(columns));
+        // Fold the naming convention into the key: emitted column names depend on it.
+        return Cache.GetOrAdd($"{key}|{(int)GaroaDefaults.BulkNamingConvention}", _ => Build(columns));
     }
 
     private static BulkColumnSet<T> Build(IReadOnlyList<string>? columns)
     {
-        (MemberInfo Member, string Column)[] selected = SelectMembers(columns);
+        (MemberInfo Member, string Column)[] selected = SelectColumns(columns);
         if (selected.Length == 0)
             throw new GaroaMappingException($"No bulk-insertable members found on '{typeof(T).FullName}'.");
 
@@ -78,7 +79,13 @@ internal sealed class BulkColumnSet<T>
         return new BulkColumnSet<T>(names, types, fill);
     }
 
-    private static (MemberInfo Member, string Column)[] SelectMembers(IReadOnlyList<string>? columns)
+    /// <summary>
+    /// The ordered (member, destination column) pairs this type bulk-inserts, applying the same
+    /// member discovery, <c>[Column]</c> resolution and explicit-column matching the runtime fill
+    /// uses. Exposed so provider writers (e.g. the PostgreSQL typed COPY writer) emit the exact same
+    /// columns without duplicating the selection rules.
+    /// </summary>
+    internal static (MemberInfo Member, string Column)[] SelectColumns(IReadOnlyList<string>? columns)
     {
         List<(MemberInfo Member, string Column)> all = DiscoverMembers();
 
@@ -118,8 +125,18 @@ internal sealed class BulkColumnSet<T>
         return members;
     }
 
-    private static string ColumnName(MemberInfo member, string fallback)
-        => member.GetCustomAttribute<ColumnAttribute>()?.Name ?? fallback;
+    // An explicit [Column] always wins; otherwise the member name goes through the configured
+    // naming convention (snake_case by default, matching PostgreSQL/MySQL column conventions).
+    private static string ColumnName(MemberInfo member, string memberName)
+    {
+        string? explicitName = member.GetCustomAttribute<ColumnAttribute>()?.Name;
+        if (explicitName is not null)
+            return explicitName;
+
+        return GaroaDefaults.BulkNamingConvention == BulkNamingConvention.SnakeCase
+            ? TypeHelper.ToSnakeCase(memberName)
+            : memberName;
+    }
 
     private static Type MemberType(MemberInfo member) => member switch
     {

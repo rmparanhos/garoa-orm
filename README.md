@@ -85,11 +85,30 @@ long inserted = await mysql.BulkInsertAsync("people", people);
 await pg.BulkInsertAsync("people", people, columns: new[] { "name", "birth_date" });
 ```
 
-> **Column names on the write side are explicit.** Unlike `Query<T>` — which has the result
-> set's real column names and matches them case- and underscore-insensitively — `BulkInsert`
-> must *emit* the destination column names. They come from the member name or `[Column("…")]`,
-> or the `columns` argument. For a snake_case table, annotate members with `[Column("birth_date")]`
-> or pass explicit `columns`.
+> **Write-side column names follow a convention.** Unlike `Query<T>` — which has the result set's
+> real column names and matches them case- and underscore-insensitively — `BulkInsert` must *emit*
+> the destination names. By default it converts each member to `snake_case` (`BirthDate` →
+> `birth_date`), matching the PostgreSQL/MySQL convention (and the read side's underscore-insensitive
+> matching), so snake_case tables need no annotations. An explicit `[Column("…")]` or the `columns`
+> argument always overrides. To emit member names verbatim instead, set
+> `GaroaDefaults.BulkNamingConvention = BulkNamingConvention.MemberName`.
+
+### Timeouts
+
+Every `Query`/`Execute`/`BulkInsert` overload takes a `commandTimeout` (in seconds) for that one
+call. To set it everywhere, configure the process-wide default once at startup:
+
+```csharp
+// Global default for any call that doesn't pass its own commandTimeout.
+GaroaDefaults.CommandTimeoutSeconds = 60;   // null = provider default (~30s); 0 = no timeout
+
+// Per-call override always wins over the global default.
+List<Person> slow = connection.Query<Person>(reportSql, commandTimeout: 300);
+ulong written = await pg.BulkInsertAsync("people", people, commandTimeout: 600);
+```
+
+The timeout flows to the underlying ADO.NET command for `Query`/`Execute`, to the PostgreSQL COPY
+writer for `BulkInsert`, and to `MySqlBulkCopy.BulkCopyTimeout` for the MySQL provider.
 
 ### Mapping rules
 
@@ -100,6 +119,43 @@ await pg.BulkInsertAsync("people", people, columns: new[] { "name", "birth_date"
 - Enums are read from their numeric column value.
 - Connections that are closed when a call begins are opened and then closed again — callers
   never leak a connection they didn't open.
+
+### Compile-time mapping (`[GaroaMapped]`)
+
+By default Garoa compiles a mapper with expression trees the first time it sees a given
+type + column layout. Annotate a type with `[GaroaMapped]` and the bundled source generator
+emits that mapper at **build time** instead:
+
+```csharp
+using Garoa;
+
+[GaroaMapped]
+public sealed class Person
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+    public DateOnly BirthDate { get; set; }
+}
+
+// Nothing else changes — Query<Person> automatically uses the generated mapper.
+List<Person> people = connection.Query<Person>("SELECT id, name, birth_date FROM people");
+```
+
+What you get:
+
+- **No runtime `.Compile()`** — the mapper ships as plain compiled code, so the first query
+  pays nothing to build it.
+- **Typed reader getters** (`GetInt64`, `GetString`, …) for BCL types, which the JIT inlines;
+  `GetFieldValue<T>` is still used for provider-resolved types like `DateOnly`/`TimeOnly`, so
+  that advantage is preserved.
+- **Native AOT / trimming friendly** — no expression-tree compilation at runtime.
+- **Identical semantics** to the runtime mapper: same case/underscore matching, `[Column]`,
+  nullable and enum handling, and the same column-accurate error messages.
+
+It's purely opt-in and per-type: unannotated types keep using the runtime mapper, and the
+runtime prefers the generated mapper automatically (it self-registers at module load). The
+generator ships inside the `Garoa` package as an analyzer — no extra dependency to add. A
+public parameterless constructor is required; types without one fall back to the runtime mapper.
 
 ## Performance
 

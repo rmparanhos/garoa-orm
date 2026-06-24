@@ -44,7 +44,8 @@ public class PostgresBulkInsertTests
             ManagerId = i == 1 ? null : 1,
         });
 
-        ulong written = await db.BulkInsertAsync("people", rows);
+        // Exercises the COPY timeout path (NpgsqlBinaryImporter.Timeout).
+        ulong written = await db.BulkInsertAsync("people", rows, commandTimeout: 30);
         Assert.Equal(1000UL, written);
 
         List<long> count = db.Query<long>("SELECT count(*) FROM people;");
@@ -72,10 +73,76 @@ public class PostgresBulkInsertTests
         };
 
         // Let the database assign id via serial: only write name + birth_date.
-        ulong written = db.BulkInsert("people", rows, new[] { "name", "birth_date" });
+        ulong written = db.BulkInsert("people", rows, new[] { "name", "birth_date" }, commandTimeout: 30);
         Assert.Equal(2UL, written);
 
         List<string> names = db.Query<string>("SELECT name FROM people ORDER BY id;");
         Assert.Equal(new[] { "Ada", "Alan" }, names);
+    }
+
+    // No [Column] attributes: relies on the default snake_case naming convention.
+    private sealed class Customer
+    {
+        public long Id { get; set; }
+        public string? FullName { get; set; }
+        public DateOnly SignupDate { get; set; }
+    }
+
+    [SkippableFact]
+    public void BulkInsert_maps_pascalcase_members_to_snake_case_columns_by_default()
+    {
+        using NpgsqlConnection db = Open();
+        db.Execute("DROP TABLE IF EXISTS customers;");
+        db.Execute("CREATE TABLE customers (id bigint PRIMARY KEY, full_name text, signup_date date);");
+
+        var rows = new[]
+        {
+            new Customer { Id = 1, FullName = "Ada Lovelace", SignupDate = new DateOnly(2020, 5, 1) },
+            new Customer { Id = 2, FullName = "Alan Turing", SignupDate = new DateOnly(2021, 6, 23) },
+        };
+
+        // FullName -> full_name, SignupDate -> signup_date, with no annotations.
+        ulong written = db.BulkInsert("customers", rows);
+        Assert.Equal(2UL, written);
+
+        List<Customer> back = db.Query<Customer>("SELECT id, full_name, signup_date FROM customers ORDER BY id;");
+        Assert.Equal("Ada Lovelace", back[0].FullName);
+        Assert.Equal(new DateOnly(2021, 6, 23), back[1].SignupDate);
+    }
+
+    private enum Priority : short { Low = 1, High = 2 }
+
+    private sealed class Job
+    {
+        [Column("id")] public int Id { get; set; }
+        [Column("priority")] public Priority Priority { get; set; }
+        [Column("due")] public DateOnly? Due { get; set; }
+    }
+
+    [SkippableFact]
+    public void BulkInsert_writes_enum_as_numeric_and_handles_nullable_value_type()
+    {
+        using NpgsqlConnection db = Open();
+        db.Execute("DROP TABLE IF EXISTS jobs;");
+        db.Execute("CREATE TABLE jobs (id int PRIMARY KEY, priority smallint, due date);");
+
+        var rows = new[]
+        {
+            new Job { Id = 1, Priority = Priority.High, Due = new DateOnly(2030, 1, 1) },
+            new Job { Id = 2, Priority = Priority.Low, Due = null },
+        };
+
+        ulong written = db.BulkInsert("jobs", rows);
+        Assert.Equal(2UL, written);
+
+        // Enum is written as its numeric backing value (smallint), via the typed COPY writer.
+        List<short> priorities = db.Query<short>("SELECT priority FROM jobs ORDER BY id;");
+        Assert.Equal(new short[] { 2, 1 }, priorities);
+
+        // Nullable DateOnly round-trips, including the null.
+        List<Job> back = db.Query<Job>("SELECT id, priority, due FROM jobs ORDER BY id;");
+        Assert.Equal(Priority.High, back[0].Priority);
+        Assert.Equal(new DateOnly(2030, 1, 1), back[0].Due);
+        Assert.Null(back[1].Due);
     }
 }

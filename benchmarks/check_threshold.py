@@ -34,14 +34,18 @@ def main() -> int:
 
     means: dict[str, dict[str, float]] = {}
     for report in reports:
+        # Use the filename stem (everything before the first '-') as the benchmark class label
+        # so that multiple classes sharing the same Parameters value are tracked independently.
+        class_label = os.path.basename(report).split("-")[0]
         with open(report) as handle:
             data = json.load(handle)
         for bench in data.get("Benchmarks", []):
             params = bench.get("Parameters", "") or "(none)"
-            means.setdefault(params, {})[bench["Method"]] = bench["Statistics"]["Mean"]
+            key = f"{class_label}[{params}]"
+            means.setdefault(key, {})[bench["Method"]] = bench["Statistics"]["Mean"]
 
     print(f"Threshold: {args.candidate} mean must be <= {args.threshold:.2f}x {args.baseline} mean\n")
-    header = f"{'Params':<14}{args.baseline + ' (ns)':>16}{args.candidate + ' (ns)':>16}{'Ratio':>10}  Status"
+    header = f"{'Params':<50}{args.baseline + ' (ns)':>16}{args.candidate + ' (ns)':>16}{'Ratio':>10}  Status"
     print(header)
     print("-" * len(header))
 
@@ -55,7 +59,7 @@ def main() -> int:
         ratio = candidate / baseline
         ok = ratio <= args.threshold
         status = "OK" if ok else "FAIL"
-        print(f"{params:<14}{baseline:>16.1f}{candidate:>16.1f}{ratio:>10.3f}  {status}")
+        print(f"{params:<50}{baseline:>16.1f}{candidate:>16.1f}{ratio:>10.3f}  {status}")
         if not ok:
             failures.append((params, ratio))
 
