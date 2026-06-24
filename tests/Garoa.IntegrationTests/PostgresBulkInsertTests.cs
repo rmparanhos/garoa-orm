@@ -80,6 +80,36 @@ public class PostgresBulkInsertTests
         Assert.Equal(new[] { "Ada", "Alan" }, names);
     }
 
+    // No [Column] attributes: relies on the default snake_case naming convention.
+    private sealed class Customer
+    {
+        public long Id { get; set; }
+        public string? FullName { get; set; }
+        public DateOnly SignupDate { get; set; }
+    }
+
+    [SkippableFact]
+    public void BulkInsert_maps_pascalcase_members_to_snake_case_columns_by_default()
+    {
+        using NpgsqlConnection db = Open();
+        db.Execute("DROP TABLE IF EXISTS customers;");
+        db.Execute("CREATE TABLE customers (id bigint PRIMARY KEY, full_name text, signup_date date);");
+
+        var rows = new[]
+        {
+            new Customer { Id = 1, FullName = "Ada Lovelace", SignupDate = new DateOnly(2020, 5, 1) },
+            new Customer { Id = 2, FullName = "Alan Turing", SignupDate = new DateOnly(2021, 6, 23) },
+        };
+
+        // FullName -> full_name, SignupDate -> signup_date, with no annotations.
+        ulong written = db.BulkInsert("customers", rows);
+        Assert.Equal(2UL, written);
+
+        List<Customer> back = db.Query<Customer>("SELECT id, full_name, signup_date FROM customers ORDER BY id;");
+        Assert.Equal("Ada Lovelace", back[0].FullName);
+        Assert.Equal(new DateOnly(2021, 6, 23), back[1].SignupDate);
+    }
+
     private enum Priority : short { Low = 1, High = 2 }
 
     private sealed class Job

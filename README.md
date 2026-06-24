@@ -85,11 +85,13 @@ long inserted = await mysql.BulkInsertAsync("people", people);
 await pg.BulkInsertAsync("people", people, columns: new[] { "name", "birth_date" });
 ```
 
-> **Column names on the write side are explicit.** Unlike `Query<T>` — which has the result
-> set's real column names and matches them case- and underscore-insensitively — `BulkInsert`
-> must *emit* the destination column names. They come from the member name or `[Column("…")]`,
-> or the `columns` argument. For a snake_case table, annotate members with `[Column("birth_date")]`
-> or pass explicit `columns`.
+> **Write-side column names follow a convention.** Unlike `Query<T>` — which has the result set's
+> real column names and matches them case- and underscore-insensitively — `BulkInsert` must *emit*
+> the destination names. By default it converts each member to `snake_case` (`BirthDate` →
+> `birth_date`), matching the PostgreSQL/MySQL convention (and the read side's underscore-insensitive
+> matching), so snake_case tables need no annotations. An explicit `[Column("…")]` or the `columns`
+> argument always overrides. To emit member names verbatim instead, set
+> `GaroaDefaults.BulkNamingConvention = BulkNamingConvention.MemberName`.
 
 ### Timeouts
 

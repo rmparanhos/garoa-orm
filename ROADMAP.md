@@ -70,9 +70,11 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
 - [x] MySQL provider via `MySqlBulkCopy`.
 - Both require only normal INSERT privileges — no DDL / special grants. (MySQL also needs
   `AllowLoadLocalInfile=True` + server `local_infile=ON`, which `MySqlBulkCopy` relies on.)
-- [ ] Optional naming convention (e.g. auto snake_case) for the write side, so snake_case
-  tables don't require `[Column]`/explicit columns. (Today the write side emits member /
-  `[Column]` names verbatim.)
+- [x] Naming convention for the write side, so snake_case tables don't require `[Column]`/explicit
+  columns. `BulkInsert` derives column names via `GaroaDefaults.BulkNamingConvention`, defaulting to
+  `SnakeCase` (`BirthDate` → `birth_date`); `[Column]` and explicit `columns` always win. Set it to
+  `MemberName` to emit members verbatim. Applied in the shared `BulkColumnSet` selection, so both
+  the MySQL reader path and the PostgreSQL typed COPY writer honour it identically.
 
 ### Connection pool & timeout
 

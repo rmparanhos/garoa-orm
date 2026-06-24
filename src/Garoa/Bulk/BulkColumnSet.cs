@@ -43,7 +43,8 @@ internal sealed class BulkColumnSet<T>
     public static BulkColumnSet<T> Get(IReadOnlyList<string>? columns)
     {
         string key = columns is null ? "*" : string.Join("", columns);
-        return Cache.GetOrAdd(key, _ => Build(columns));
+        // Fold the naming convention into the key: emitted column names depend on it.
+        return Cache.GetOrAdd($"{key}|{(int)GaroaDefaults.BulkNamingConvention}", _ => Build(columns));
     }
 
     private static BulkColumnSet<T> Build(IReadOnlyList<string>? columns)
@@ -124,8 +125,18 @@ internal sealed class BulkColumnSet<T>
         return members;
     }
 
-    private static string ColumnName(MemberInfo member, string fallback)
-        => member.GetCustomAttribute<ColumnAttribute>()?.Name ?? fallback;
+    // An explicit [Column] always wins; otherwise the member name goes through the configured
+    // naming convention (snake_case by default, matching PostgreSQL/MySQL column conventions).
+    private static string ColumnName(MemberInfo member, string memberName)
+    {
+        string? explicitName = member.GetCustomAttribute<ColumnAttribute>()?.Name;
+        if (explicitName is not null)
+            return explicitName;
+
+        return GaroaDefaults.BulkNamingConvention == BulkNamingConvention.SnakeCase
+            ? TypeHelper.ToSnakeCase(memberName)
+            : memberName;
+    }
 
     private static Type MemberType(MemberInfo member) => member switch
     {

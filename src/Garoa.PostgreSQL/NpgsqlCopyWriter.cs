@@ -44,7 +44,9 @@ internal sealed class NpgsqlCopyWriter<T>
 
     public static NpgsqlCopyWriter<T> Get(IReadOnlyList<string>? columns)
     {
-        string key = columns is null ? "*" : string.Join("", columns);
+        // Keyed by column layout + naming convention, since the latter changes the emitted columns.
+        string key = (columns is null ? "*" : string.Join("", columns))
+            + $"|{(int)GaroaDefaults.BulkNamingConvention}";
         return Cache.GetOrAdd(key, _ => Build(columns));
     }
 

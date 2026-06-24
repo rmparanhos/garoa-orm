@@ -36,4 +36,12 @@ public static class GaroaDefaults
     /// may itself be <see langword="null"/>, meaning "leave the provider default").
     /// </summary>
     internal static int? ResolveCommandTimeout(int? perCall) => perCall ?? _commandTimeoutSeconds;
+
+    /// <summary>
+    /// Convention used to derive a destination column name from a member during <c>BulkInsert</c>
+    /// when the member has no <see cref="ColumnAttribute"/> and the call passes no explicit columns.
+    /// Defaults to <see cref="BulkNamingConvention.SnakeCase"/> (the PostgreSQL/MySQL convention);
+    /// set it once at startup. An explicit <c>[Column]</c> or <c>columns</c> argument always wins.
+    /// </summary>
+    public static BulkNamingConvention BulkNamingConvention { get; set; } = BulkNamingConvention.SnakeCase;
 }
