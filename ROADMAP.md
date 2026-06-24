@@ -191,3 +191,16 @@ connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that
   a CI service container exactly like the PG/MySQL ones. Production licensing is the consumer's
   concern, not Garoa's. (`Query`/`Execute` already work against SQL Server today — only bulk is
   provider-specific.)
+- [ ] **`BulkUpsert<T>` — high-volume upsert** (requested; the common "staging + `ON CONFLICT`"
+  pattern, mechanised). `BulkInsert`/COPY only appends, so high-volume upsert today means hand-rolling
+  a staging table + a set-based merge. `BulkUpsert` would: (1) create a temp staging table, (2) stream
+  the rows into it via the existing `BulkInsert` core (`BulkColumnSet` + the typed COPY writer),
+  (3) run one set-based upsert from staging into the target, (4) let the temp table drop itself. API
+  shape: target table, rows, conflict-key columns, optional update columns (default: all non-key
+  columns). Reuses the bulk core, but it is a **thicker shell than `BulkInsert`** because the upsert
+  dialect diverges per provider and the "conflict key" concept does not map 1:1:
+    - PostgreSQL: `INSERT ... SELECT ... FROM staging ON CONFLICT (keys) DO UPDATE SET col = EXCLUDED.col` — keys are named.
+    - MySQL: `INSERT ... SELECT ... FROM staging ON DUPLICATE KEY UPDATE col = VALUES(col)` — fires on any unique/PK index; keys are *not* named.
+  Single-row / moderate-batch upsert needs no feature — a multi-row `INSERT ... ON CONFLICT` already
+  runs through `Execute` today (worth documenting as a pattern). A generated single-row `Upsert(obj)`
+  stays **out** (SQL generation + a per-dialect matrix = bloat).
