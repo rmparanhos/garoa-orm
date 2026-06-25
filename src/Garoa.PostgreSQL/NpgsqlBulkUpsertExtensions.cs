@@ -4,7 +4,7 @@ using Npgsql;
 namespace Garoa;
 
 /// <summary>
-/// High-volume upsert for PostgreSQL. Streams <paramref name="rows"/> into a temporary staging table
+/// High-volume upsert for PostgreSQL. Streams the rows into a temporary staging table
 /// via the binary COPY protocol (reusing <see cref="NpgsqlCopyWriter{T}"/>, so value types are never
 /// boxed), then merges them into the target with a single set-based
 /// <c>INSERT ... SELECT ... ON CONFLICT (...) DO UPDATE</c>. The source sequence is never fully
