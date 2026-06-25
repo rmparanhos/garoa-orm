@@ -131,8 +131,8 @@ see "Requested but not yet scheduled".)
     (COPY / `MySqlBulkCopy`, `GaroaBulk`) against a chunked multi-row `INSERT ... VALUES` executed
     through Dapper (`Dapper`, the `[Baseline]`) for 1 000 / 10 000 rows. The baseline is a competent
     multi-row insert, not a per-row `Execute` loop (an anti-pattern, deliberately not measured). The
-    CI gate `GAROA_BULK_THRESHOLD` holds `GaroaBulk` within `1.20x` of the Dapper baseline (expected
-    well under 1).
+    CI gate `GAROA_BULK_THRESHOLD` holds `GaroaBulk` within `1.50x` of the Dapper baseline (expected
+    well under 1; the bound is loose because MySQL bulk-copy at the 1000-row batch is noisy on CI).
 
 ---
 
