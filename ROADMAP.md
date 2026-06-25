@@ -203,4 +203,7 @@ connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that
     - MySQL: `INSERT ... SELECT ... FROM staging ON DUPLICATE KEY UPDATE col = VALUES(col)` — fires on any unique/PK index; keys are *not* named.
   Single-row / moderate-batch upsert needs no feature — a multi-row `INSERT ... ON CONFLICT` already
   runs through `Execute` today (worth documenting as a pattern). A generated single-row `Upsert(obj)`
-  stays **out** (SQL generation + a per-dialect matrix = bloat).
+  stays **out** (SQL generation + a per-dialect matrix = bloat). **Benchmark-first**: an exploratory
+  `PostgresBulkUpsertBenchmarks` measures the staging+COPY approach (`StagingCopy`) against a
+  chunked multi-row `INSERT ... ON CONFLICT` (`Dapper`, the baseline) on a half-populated table
+  (~50% updates / 50% inserts), so we confirm the win justifies the thicker API before building it.
