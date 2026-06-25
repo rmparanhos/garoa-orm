@@ -54,6 +54,11 @@ List<Person> people = connection.Query<Person>(
 // Scalars work too.
 List<int> ids = connection.Query<int>("SELECT id FROM people");
 
+// Single row: QueryFirstOrDefault returns the row or null (fetches one row, no list built).
+// Pair it with LIMIT/TOP 1 in your SQL — Garoa never injects one. QueryFirst throws if there's none.
+Person? one = connection.QueryFirstOrDefault<Person>(
+    "SELECT id, name, birth_date FROM people WHERE id = @Id LIMIT 1", new { Id = 1 });
+
 // INSERT / UPDATE / DELETE — returns rows affected.
 int affected = connection.Execute(
     "UPDATE people SET name = @Name WHERE id = @Id",

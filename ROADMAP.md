@@ -33,9 +33,9 @@ The v1 surface is intentionally tiny:
 | INSERT/UPDATE/DELETE     | `Execute`                       | Returns rows affected                   |
 | Bulk insert (high volume)| `BulkInsert<T>(IEnumerable<T>)` | Streaming, never materialised in memory |
 
-Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map,
-`QueryFirst`. (The `QueryFirst`/`QuerySingle` family is now planned for a later version —
-see "Requested but not yet scheduled".)
+Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map.
+(`QueryFirst`/`QueryFirstOrDefault` have since shipped — see "Requested but not yet scheduled";
+the stricter `QuerySingle*` remain deferred.)
 
 ### Result mapping
 
@@ -163,7 +163,8 @@ The guiding rule: each is a **thin shell over the existing core** (mapper cache,
 connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that would need a
 *parallel* stack to what we already have is a bloat warning and gets questioned first.
 
-- [ ] **`QueryFirst` / `QueryFirstOrDefault`** (sync + async) — the workhorse single-row reads
+- [x] **`QueryFirst` / `QueryFirstOrDefault`** (sync + async) — **implemented**. The workhorse
+  single-row reads
   (`QueryFirstOrDefault` = "fetch by id → entity or `null`", the most common query of all). More
   ergonomic and more efficient than `Query<T>(...).FirstOrDefault()`, which materialises the whole
   result set. One shared private core: read the first row via `CommandBehavior.SingleRow` (the DB

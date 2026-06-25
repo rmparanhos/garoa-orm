@@ -49,6 +49,126 @@ public static class GaroaConnectionExtensions
         }
     }
 
+    /// <summary>
+    /// Returns the first row mapped to <typeparamref name="T"/>, throwing when the query yields no
+    /// rows. Hints the provider to fetch a single row (<see cref="CommandBehavior.SingleRow"/>) and
+    /// never materialises a list. Use this when the row is expected to exist (pair it with a
+    /// <c>LIMIT</c>/<c>TOP 1</c> in your SQL — Garoa never injects one).
+    /// </summary>
+    public static T QueryFirst<T>(
+        this DbConnection connection,
+        string sql,
+        object? param = null,
+        int? commandTimeout = null,
+        CommandType? commandType = null)
+        => QueryFirstRow<T>(connection, sql, param, commandTimeout, commandType, throwIfEmpty: true)!;
+
+    /// <summary>
+    /// Returns the first row mapped to <typeparamref name="T"/>, or <see langword="default"/>
+    /// (<see langword="null"/> for a reference type) when the query yields no rows. The idiomatic
+    /// "fetch by id → entity or null".
+    /// </summary>
+    public static T? QueryFirstOrDefault<T>(
+        this DbConnection connection,
+        string sql,
+        object? param = null,
+        int? commandTimeout = null,
+        CommandType? commandType = null)
+        => QueryFirstRow<T>(connection, sql, param, commandTimeout, commandType, throwIfEmpty: false);
+
+    /// <summary>Asynchronously returns the first row, throwing when the query yields no rows.</summary>
+    public static async Task<T> QueryFirstAsync<T>(
+        this DbConnection connection,
+        string sql,
+        object? param = null,
+        int? commandTimeout = null,
+        CommandType? commandType = null,
+        CancellationToken cancellationToken = default)
+        => (await QueryFirstRowAsync<T>(connection, sql, param, commandTimeout, commandType, throwIfEmpty: true, cancellationToken)
+            .ConfigureAwait(false))!;
+
+    /// <summary>Asynchronously returns the first row, or <see langword="default"/> when there are none.</summary>
+    public static Task<T?> QueryFirstOrDefaultAsync<T>(
+        this DbConnection connection,
+        string sql,
+        object? param = null,
+        int? commandTimeout = null,
+        CommandType? commandType = null,
+        CancellationToken cancellationToken = default)
+        => QueryFirstRowAsync<T>(connection, sql, param, commandTimeout, commandType, throwIfEmpty: false, cancellationToken);
+
+    private static T? QueryFirstRow<T>(
+        DbConnection connection,
+        string sql,
+        object? param,
+        int? commandTimeout,
+        CommandType? commandType,
+        bool throwIfEmpty)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        bool wasClosed = connection.State == ConnectionState.Closed;
+        using DbCommand command = CreateCommand(connection, sql, param, commandTimeout, commandType);
+        try
+        {
+            if (wasClosed)
+                connection.Open();
+
+            using DbDataReader reader = command.ExecuteReader(CommandBehavior.SingleRow | CommandBehavior.SingleResult);
+            if (!reader.Read())
+                return throwIfEmpty ? throw NoRows() : default;
+
+            return Mapper<T>.ForReader(reader)(reader);
+        }
+        finally
+        {
+            if (wasClosed)
+                connection.Close();
+        }
+    }
+
+    private static async Task<T?> QueryFirstRowAsync<T>(
+        DbConnection connection,
+        string sql,
+        object? param,
+        int? commandTimeout,
+        CommandType? commandType,
+        bool throwIfEmpty,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        bool wasClosed = connection.State == ConnectionState.Closed;
+        DbCommand command = CreateCommand(connection, sql, param, commandTimeout, commandType);
+        await using (command.ConfigureAwait(false))
+        {
+            try
+            {
+                if (wasClosed)
+                    await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+                DbDataReader reader = await command
+                    .ExecuteReaderAsync(CommandBehavior.SingleRow | CommandBehavior.SingleResult, cancellationToken)
+                    .ConfigureAwait(false);
+                await using (reader.ConfigureAwait(false))
+                {
+                    if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        return throwIfEmpty ? throw NoRows() : default;
+
+                    return Mapper<T>.ForReader(reader)(reader);
+                }
+            }
+            finally
+            {
+                if (wasClosed)
+                    await connection.CloseAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static InvalidOperationException NoRows() =>
+        new("QueryFirst expected at least one row, but the query returned none.");
+
     /// <summary>Executes a non-query statement (INSERT/UPDATE/DELETE) and returns rows affected.</summary>
     public static int Execute(
         this DbConnection connection,
