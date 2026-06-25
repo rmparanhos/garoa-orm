@@ -34,7 +34,8 @@ The v1 surface is intentionally tiny:
 | Bulk insert (high volume)| `BulkInsert<T>(IEnumerable<T>)` | Streaming, never materialised in memory |
 
 Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map,
-`QueryFirst`.
+`QueryFirst`. (The `QueryFirst`/`QuerySingle` family is now planned for a later version —
+see "Requested but not yet scheduled".)
 
 ### Result mapping
 
@@ -130,8 +131,8 @@ Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map
     (COPY / `MySqlBulkCopy`, `GaroaBulk`) against a chunked multi-row `INSERT ... VALUES` executed
     through Dapper (`Dapper`, the `[Baseline]`) for 1 000 / 10 000 rows. The baseline is a competent
     multi-row insert, not a per-row `Execute` loop (an anti-pattern, deliberately not measured). The
-    CI gate `GAROA_BULK_THRESHOLD` holds `GaroaBulk` within `1.20x` of the Dapper baseline (expected
-    well under 1).
+    CI gate `GAROA_BULK_THRESHOLD` holds `GaroaBulk` within `1.50x` of the Dapper baseline (expected
+    well under 1; the bound is loose because MySQL bulk-copy at the 1000-row batch is noisy on CI).
 
 ---
 
@@ -155,3 +156,54 @@ builder will build on.
 ## Requested but not yet scheduled
 
 (Capture ad-hoc requests here as they arrive, before they're slotted above.)
+
+### Planned post-v1 API additions
+
+The guiding rule: each is a **thin shell over the existing core** (mapper cache, `ParameterBinder`,
+connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that would need a
+*parallel* stack to what we already have is a bloat warning and gets questioned first.
+
+- [ ] **`QueryFirst` / `QueryFirstOrDefault`** (sync + async) — the workhorse single-row reads
+  (`QueryFirstOrDefault` = "fetch by id → entity or `null`", the most common query of all). More
+  ergonomic and more efficient than `Query<T>(...).FirstOrDefault()`, which materialises the whole
+  result set. One shared private core: read the first row via `CommandBehavior.SingleRow` (the DB
+  streams a single row, no `List` built), then either return it or, when empty, *throw* (`First`) or
+  return `default(T)` (`FirstOrDefault`). Reuses `Mapper<T>` unchanged — **no new mapping code**. Low
+  bloat risk; first candidate. Note: `SingleRow` is a client-side hint, **not** `LIMIT 1`/`TOP 1` —
+  for the server to actually stop early, put the limit in your SQL. The method never injects it
+  (that would be SQL rewriting).
+- [ ] **`QuerySingle` / `QuerySingleOrDefault`** — deferred until asked. They assert *exactly one*
+  row, which is a narrower need and costs an extra fetch (they must read a **second** row via
+  `SingleResult` just to reject `>1`). For a PK lookup you already trust the cardinality, so
+  `QueryFirstOrDefault` is the cheaper, idiomatic choice; `Query<T>` already lets you check `.Count`
+  and throw your own way. Same shared core as the `First*` pair when it lands.
+- [ ] **`IN` expansion** (`WHERE id IN @ids`) — scoped tightly so it never becomes a SQL rewriter.
+  Only expand a parameter whose value is a non-string `IEnumerable`: replace the `@name` token with
+  `(@name0, @name1, …)` and add one parameter per element in the binder. **Must** handle the
+  empty-list case (rewrite to a guaranteed-false predicate, never emit `IN ()`). Note: on PostgreSQL,
+  `= ANY(@ids)` with a native array parameter avoids expansion entirely; the generic text expansion
+  exists for cross-provider parity with Dapper migrants. Higher bloat risk than the above — keep the
+  token scan deliberately simple and documented as a small feature, not a parser.
+- [ ] **`Garoa.SqlServer` bulk insert** via `SqlBulkCopy` (`Microsoft.Data.SqlClient`) — desired,
+  deferred. Reuses the existing `ObjectDataReader<T>` + `BulkColumnSet` (same shape as the MySQL
+  provider), so it is mostly a new package plus integration tests. Dev and CI cost nothing: SQL Server
+  Developer Edition is free, and the official Docker image (`mcr.microsoft.com/mssql/server`) runs as
+  a CI service container exactly like the PG/MySQL ones. Production licensing is the consumer's
+  concern, not Garoa's. (`Query`/`Execute` already work against SQL Server today — only bulk is
+  provider-specific.)
+- [ ] **`BulkUpsert<T>` — high-volume upsert** (requested; the common "staging + `ON CONFLICT`"
+  pattern, mechanised). `BulkInsert`/COPY only appends, so high-volume upsert today means hand-rolling
+  a staging table + a set-based merge. `BulkUpsert` would: (1) create a temp staging table, (2) stream
+  the rows into it via the existing `BulkInsert` core (`BulkColumnSet` + the typed COPY writer),
+  (3) run one set-based upsert from staging into the target, (4) let the temp table drop itself. API
+  shape: target table, rows, conflict-key columns, optional update columns (default: all non-key
+  columns). Reuses the bulk core, but it is a **thicker shell than `BulkInsert`** because the upsert
+  dialect diverges per provider and the "conflict key" concept does not map 1:1:
+    - PostgreSQL: `INSERT ... SELECT ... FROM staging ON CONFLICT (keys) DO UPDATE SET col = EXCLUDED.col` — keys are named.
+    - MySQL: `INSERT ... SELECT ... FROM staging ON DUPLICATE KEY UPDATE col = VALUES(col)` — fires on any unique/PK index; keys are *not* named.
+  Single-row / moderate-batch upsert needs no feature — a multi-row `INSERT ... ON CONFLICT` already
+  runs through `Execute` today (worth documenting as a pattern). A generated single-row `Upsert(obj)`
+  stays **out** (SQL generation + a per-dialect matrix = bloat). **Benchmark-first**: an exploratory
+  `PostgresBulkUpsertBenchmarks` measures the staging+COPY approach (`StagingCopy`) against a
+  chunked multi-row `INSERT ... ON CONFLICT` (`Dapper`, the baseline) on a half-populated table
+  (~50% updates / 50% inserts), so we confirm the win justifies the thicker API before building it.
