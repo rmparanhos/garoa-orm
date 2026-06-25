@@ -122,5 +122,5 @@ public static class NpgsqlBulkInsertExtensions
             writer.Timeout = TimeSpan.FromSeconds(effectiveTimeout.Value);
     }
 
-    private static string Quote(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
+    internal static string Quote(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
 }

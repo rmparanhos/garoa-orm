@@ -88,6 +88,10 @@ long inserted = await mysql.BulkInsertAsync("people", people);
 
 // Write a subset / control column order (e.g. let the DB assign an identity column):
 await pg.BulkInsertAsync("people", people, columns: new[] { "name", "birth_date" });
+
+// High-volume upsert (PostgreSQL): streams to a temp staging table, then one set-based
+// INSERT ... ON CONFLICT (id) DO UPDATE. Updates every written column except the keys by default.
+ulong upserted = await pg.BulkUpsertAsync("people", people, conflictKeys: new[] { "id" });
 ```
 
 > **Write-side column names follow a convention.** Unlike `Query<T>` — which has the result set's

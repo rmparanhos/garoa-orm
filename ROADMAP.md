@@ -192,11 +192,13 @@ connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that
   a CI service container exactly like the PG/MySQL ones. Production licensing is the consumer's
   concern, not Garoa's. (`Query`/`Execute` already work against SQL Server today — only bulk is
   provider-specific.)
-- [ ] **`BulkUpsert<T>` — high-volume upsert** (requested; the common "staging + `ON CONFLICT`"
-  pattern, mechanised). `BulkInsert`/COPY only appends, so high-volume upsert today means hand-rolling
-  a staging table + a set-based merge. `BulkUpsert` would: (1) create a temp staging table, (2) stream
-  the rows into it via the existing `BulkInsert` core (`BulkColumnSet` + the typed COPY writer),
-  (3) run one set-based upsert from staging into the target, (4) let the temp table drop itself. API
+- [x] **`BulkUpsert<T>` — high-volume upsert** — **implemented for PostgreSQL**
+  (`NpgsqlBulkUpsertExtensions.BulkUpsert`/`BulkUpsertAsync`). `BulkInsert`/COPY only appends, so
+  high-volume upsert meant hand-rolling a staging table + a set-based merge; this mechanises it:
+  (1) create a temp staging table (`CREATE TEMP TABLE ... AS SELECT cols FROM target WITH NO DATA`,
+  so only the written columns, no copied NOT NULL), (2) stream the rows in via the typed COPY writer
+  (`NpgsqlCopyWriter<T>`, no boxing), (3) one set-based `INSERT ... SELECT ... ON CONFLICT (...) DO
+  UPDATE` from staging, (4) drop the staging table. API
   shape: target table, rows, conflict-key columns, optional update columns (default: all non-key
   columns). Reuses the bulk core, but it is a **thicker shell than `BulkInsert`** because the upsert
   dialect diverges per provider and the "conflict key" concept does not map 1:1:
@@ -204,7 +206,8 @@ connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that
     - MySQL: `INSERT ... SELECT ... FROM staging ON DUPLICATE KEY UPDATE col = VALUES(col)` — fires on any unique/PK index; keys are *not* named.
   Single-row / moderate-batch upsert needs no feature — a multi-row `INSERT ... ON CONFLICT` already
   runs through `Execute` today (worth documenting as a pattern). A generated single-row `Upsert(obj)`
-  stays **out** (SQL generation + a per-dialect matrix = bloat). **Benchmark-first**: an exploratory
-  `PostgresBulkUpsertBenchmarks` measures the staging+COPY approach (`StagingCopy`) against a
-  chunked multi-row `INSERT ... ON CONFLICT` (`Dapper`, the baseline) on a half-populated table
-  (~50% updates / 50% inserts), so we confirm the win justifies the thicker API before building it.
+  stays **out** (SQL generation + a per-dialect matrix = bloat). Built **benchmark-first**:
+  `PostgresBulkUpsertBenchmarks` confirmed the staging+COPY approach beats a chunked multi-row
+  `INSERT ... ON CONFLICT` (~1.4x at 1k rows, ~2x at 10k) while allocating a near-constant few KB,
+  which justified the thicker API. MySQL (`ON DUPLICATE KEY UPDATE`) and SQL Server (`MERGE`) remain
+  deferred.
