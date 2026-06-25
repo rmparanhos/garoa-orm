@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Garoa.Benchmarks.MySqlBulkInsertBenchmarks-20260625-012551</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat)
+AMD EPYC 9V45, 1 CPU, 4 logical and 2 physical cores
+.NET SDK 10.0.301
+  [Host]     : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX-512F+CD+BW+DQ+VL+VBMI
+  Job-NVVPSZ : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX-512F+CD+BW+DQ+VL+VBMI
+</code></pre>
+<pre><code>Runtime=.NET 8.0  InvocationCount=1  IterationCount=10  
+UnrollFactor=1  WarmupCount=2  
+</code></pre>
+
+<table>
+<thead><tr><th>Method  </th><th>Rows</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Median</th><th>Ratio</th><th>RatioSD</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Dapper</td><td>1000</td><td>27.10 ms</td><td>41.43 ms</td><td>21.67 ms</td><td>20.496 ms</td><td>1.36</td><td>1.26</td><td>2794.9 KB</td><td>1.00</td>
+</tr><tr><td>ManualBulkCopy</td><td>1000</td><td>16.52 ms</td><td>39.59 ms</td><td>20.71 ms</td><td>7.471 ms</td><td>0.83</td><td>1.12</td><td>477.17 KB</td><td>0.17</td>
+</tr><tr><td>GaroaBulk</td><td>1000</td><td>35.11 ms</td><td>48.21 ms</td><td>31.88 ms</td><td>18.303 ms</td><td>1.76</td><td>1.82</td><td>111.56 KB</td><td>0.04</td>
+</tr><tr><td>Dapper</td><td>10000</td><td>622.26 ms</td><td>681.32 ms</td><td>405.44 ms</td><td>465.695 ms</td><td>1.53</td><td>1.48</td><td>27936.61 KB</td><td>1.00</td>
+</tr><tr><td>ManualBulkCopy</td><td>10000</td><td>242.33 ms</td><td>206.14 ms</td><td>136.35 ms</td><td>233.849 ms</td><td>0.60</td><td>0.54</td><td>5260.66 KB</td><td>0.19</td>
+</tr><tr><td>GaroaBulk</td><td>10000</td><td>298.53 ms</td><td>321.51 ms</td><td>212.66 ms</td><td>243.893 ms</td><td>0.73</td><td>0.75</td><td>1060.78 KB</td><td>0.04</td>
+</tr></tbody></table>
+</body>
+</html>
