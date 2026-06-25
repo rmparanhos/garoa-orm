@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Garoa.Benchmarks.PostgresBulkUpsertBenchmarks-20260625-014159</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat)
+AMD EPYC 9V74, 1 CPU, 4 logical and 2 physical cores
+.NET SDK 10.0.301
+  [Host]     : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+  Job-IUIATW : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+</code></pre>
+<pre><code>Runtime=.NET 8.0  InvocationCount=1  IterationCount=10  
+UnrollFactor=1  WarmupCount=2  
+</code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>Rows</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Dapper</td><td>1000</td><td>16.64 ms</td><td>2.489 ms</td><td>1.302 ms</td><td>1.01</td><td>0.10</td><td>2656.59 KB</td><td>1.000</td>
+</tr><tr><td>StagingCopy</td><td>1000</td><td>11.60 ms</td><td>2.100 ms</td><td>1.249 ms</td><td>0.70</td><td>0.09</td><td>4.81 KB</td><td>0.002</td>
+</tr><tr><td>Dapper</td><td>10000</td><td>125.83 ms</td><td>40.216 ms</td><td>23.932 ms</td><td>1.03</td><td>0.24</td><td>26553.7 KB</td><td>1.000</td>
+</tr><tr><td>StagingCopy</td><td>10000</td><td>59.41 ms</td><td>18.538 ms</td><td>12.262 ms</td><td>0.48</td><td>0.12</td><td>6.13 KB</td><td>0.000</td>
+</tr></tbody></table>
+</body>
+</html>
