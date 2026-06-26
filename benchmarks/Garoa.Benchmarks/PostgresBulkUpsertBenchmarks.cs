@@ -7,18 +7,18 @@ using Npgsql;
 namespace Garoa.Benchmarks;
 
 /// <summary>
-/// High-volume upsert over a real PostgreSQL connection — an exploratory benchmark to decide whether
-/// a <c>BulkUpsert</c> API (staging table + set-based <c>ON CONFLICT</c>) is worth building, before
-/// building it. No Garoa API is exercised here; both approaches are hand-written, the way the
-/// <c>ManualCopy</c> floor was for the insert benchmark.
+/// High-volume upsert over a real PostgreSQL connection, comparing Garoa's <c>BulkUpsert</c> API
+/// against the best a Dapper user can hand-write, plus the hand-written staging floor.
 /// <list type="bullet">
 ///   <item><c>Dapper</c> (the <see cref="BenchmarkAttribute.Baseline"/>) — a chunked multi-row
 ///   <c>INSERT ... VALUES (...),(...) ON CONFLICT (id) DO UPDATE SET ...</c> executed through Dapper.
 ///   The best a Dapper user can hand-write without a bulk path.</item>
-///   <item><c>StagingCopy</c> — the candidate <c>BulkUpsert</c> shape: a temp staging table, the rows
-///   streamed in via binary <c>COPY</c>, then one set-based
+///   <item><c>ManualStaging</c> — the floor: a hand-written temp staging table, the rows streamed in
+///   via binary <c>COPY</c>, then one set-based
 ///   <c>INSERT INTO target SELECT ... FROM staging ON CONFLICT (id) DO UPDATE</c>, then the staging
-///   table dropped. The create/copy/merge/drop cost is all inside the measured method.</item>
+///   table dropped. This is the shape <c>BulkUpsert</c> wraps, so <c>GaroaBulk</c> vs
+///   <c>ManualStaging</c> exposes the cost of Garoa's typed COPY writer and column reflection.</item>
+///   <item><c>GaroaBulk</c> — the real <c>BulkUpsert</c> API. This is what the bulk threshold gates.</item>
 /// </list>
 /// The table is pre-populated with half the keys, so each upsert is ~50% updates / 50% inserts.
 /// <para>
@@ -117,9 +117,10 @@ public class PostgresBulkUpsertBenchmarks
         }
     }
 
-    // Candidate BulkUpsert shape: staging temp table + COPY + one set-based ON CONFLICT merge.
+    // The floor: hand-written staging temp table + COPY + one set-based ON CONFLICT merge. This is
+    // the shape BulkUpsert wraps, so GaroaBulk vs ManualStaging exposes Garoa's per-row overhead.
     [Benchmark]
-    public void StagingCopy()
+    public void ManualStaging()
     {
         Exec("DROP TABLE IF EXISTS staging");
         Exec("CREATE TEMP TABLE staging (LIKE bench_upsert)");
@@ -133,6 +134,11 @@ public class PostgresBulkUpsertBenchmarks
 
         Exec("DROP TABLE staging");
     }
+
+    // The real Garoa API: typed COPY into its own staging table, then the set-based ON CONFLICT merge.
+    // Default updateColumns = every written column except the conflict key, matching UpdateSet above.
+    [Benchmark]
+    public ulong GaroaBulk() => _connection.BulkUpsert("bench_upsert", _rows, conflictKeys: new[] { "id" });
 
     private void Exec(string sql)
     {
