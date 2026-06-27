@@ -78,7 +78,7 @@ jobs:
 
       - name: Run benchmarks
         working-directory: benchmarks/Garoa.Benchmarks
-        run: dotnet run -c Release -- --filter '*' --exporters json markdown
+        run: dotnet run -c Release -- --filter '*' --exporters json github
 
       - name: Upload benchmark results
         if: always()
@@ -110,9 +110,9 @@ jobs:
             printf "## Benchmark Results\n\n"
             printf "Garoa vs Dapper — **Ratio** is the meaningful column "
             printf "(runner noise hits both equally, so the ratio is stable).\n\n"
-            for f in "${RESULTS_DIR}"/*.md; do
+            for f in "${RESULTS_DIR}"/*-report-github.md; do
               [ -f "$f" ] || continue
-              printf "### %s\n\n" "$(basename "$f" -report.md)"
+              printf "### %s\n\n" "$(basename "$f" -report-github.md)"
               cat "$f"
               printf "\n\n"
             done

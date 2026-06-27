@@ -26,6 +26,13 @@ public static class NpgsqlBulkUpsertExtensions
     /// <param name="updateColumns">Columns to overwrite on conflict; when null, every written column except the conflict keys. An empty set becomes <c>DO NOTHING</c>.</param>
     /// <param name="columns">Columns to write; when null, all readable members of <typeparamref name="T"/> are used.</param>
     /// <param name="commandTimeout">Timeout in seconds for each statement; when null, falls back to <see cref="GaroaDefaults.CommandTimeoutSeconds"/>.</param>
+    /// <remarks>
+    /// The conflict keys must be unique within a single call. PostgreSQL's <c>ON CONFLICT DO UPDATE</c>
+    /// cannot affect the same target row twice in one command, so a batch containing duplicate conflict
+    /// keys fails with <c>"ON CONFLICT DO UPDATE command cannot affect row a second time"</c>. This is
+    /// deliberate: Garoa does not silently drop one of the duplicates, since which value should win is
+    /// the caller's decision. Deduplicate the input yourself before calling if it may contain repeats.
+    /// </remarks>
     public static ulong BulkUpsert<T>(
         this NpgsqlConnection connection,
         string table,
@@ -80,6 +87,11 @@ public static class NpgsqlBulkUpsertExtensions
     }
 
     /// <summary>Asynchronously bulk-upserts <paramref name="rows"/> into <paramref name="table"/>.</summary>
+    /// <remarks>
+    /// The conflict keys must be unique within a single call; duplicates fail with PostgreSQL's
+    /// <c>"ON CONFLICT DO UPDATE command cannot affect row a second time"</c> rather than being silently
+    /// dropped. See <see cref="BulkUpsert{T}"/> for details. Deduplicate the input yourself if needed.
+    /// </remarks>
     public static async Task<ulong> BulkUpsertAsync<T>(
         this NpgsqlConnection connection,
         string table,

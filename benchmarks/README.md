@@ -60,14 +60,14 @@ Each class pins `invocationCount: 1` with an `[IterationSetup]` that truncates t
 iteration is exactly one full bulk load against an empty table (no primary-key clashes). They need a
 real server and will throw in `[GlobalSetup]` if the env var is unset.
 
-### Exploratory: `PostgresBulkUpsertBenchmarks`
+### `PostgresBulkUpsertBenchmarks`
 
-A decision benchmark (no Garoa API yet) for whether a `BulkUpsert` is worth building. On a
-half-populated table (~50% updates / 50% inserts) it compares a chunked multi-row
-`INSERT ... ON CONFLICT DO UPDATE` (`Dapper`, baseline) against the candidate `BulkUpsert` shape
-(`StagingCopy`: temp staging table → binary `COPY` → one set-based `ON CONFLICT` merge → drop). It is
-informational — not wired to a regression gate — and exists to confirm the staging approach beats the
-hand-written multi-row upsert by enough to justify the thicker API.
+High-volume upsert on a half-populated table (~50% updates / 50% inserts). It compares a chunked
+multi-row `INSERT ... ON CONFLICT DO UPDATE` (`Dapper`, the baseline) against Garoa's real
+`BulkUpsert` API (`GaroaBulk`) and the hand-written staging floor (`ManualStaging`: temp staging
+table → binary `COPY` → one set-based `ON CONFLICT` merge → drop). `GaroaBulk` vs `ManualStaging`
+isolates Garoa's per-row overhead (typed COPY writer + column reflection), and `GaroaBulk` is covered
+by the same bulk regression gate as `BulkInsert` (`--candidate GaroaBulk`).
 
 ## Running locally
 
