@@ -178,13 +178,15 @@ connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that
   `SingleResult` just to reject `>1`). For a PK lookup you already trust the cardinality, so
   `QueryFirstOrDefault` is the cheaper, idiomatic choice; `Query<T>` already lets you check `.Count`
   and throw your own way. Same shared core as the `First*` pair when it lands.
-- [ ] **`IN` expansion** (`WHERE id IN @ids`) — scoped tightly so it never becomes a SQL rewriter.
-  Only expand a parameter whose value is a non-string `IEnumerable`: replace the `@name` token with
-  `(@name0, @name1, …)` and add one parameter per element in the binder. **Must** handle the
-  empty-list case (rewrite to a guaranteed-false predicate, never emit `IN ()`). Note: on PostgreSQL,
-  `= ANY(@ids)` with a native array parameter avoids expansion entirely; the generic text expansion
-  exists for cross-provider parity with Dapper migrants. Higher bloat risk than the above — keep the
-  token scan deliberately simple and documented as a small feature, not a parser.
+- [x] **`IN` expansion** (`WHERE id IN @ids`) — scoped tightly so it never becomes a SQL rewriter.
+  Implemented in `ParameterBinder`: a parameter whose value is a non-string, non-`byte[]`
+  `IEnumerable` has its `@name` token replaced with `(@name0, @name1, …)` and one parameter added per
+  element. An empty sequence rewrites to a guaranteed-false predicate (`(SELECT 1 WHERE 1=0)`), never
+  `IN ()`. The token scan is a single case-insensitive regex with word-boundary and `@@` guards — a
+  deliberate substitution, not a parser. Built primarily for **MySQL** (which has no `= ANY` array
+  escape hatch) and Dapper migrants; on PostgreSQL `= ANY(@ids)` with a native array parameter avoids
+  expansion entirely (single cached plan, empty array handled natively) and is preferable there.
+  Deliberately omits Dapper's power-of-two list padding (a plan-cache optimisation) for now.
 - [ ] **`Garoa.SqlServer` bulk insert** via `SqlBulkCopy` (`Microsoft.Data.SqlClient`) — desired,
   deferred. Reuses the existing `ObjectDataReader<T>` + `BulkColumnSet` (same shape as the MySQL
   provider), so it is mostly a new package plus integration tests. Dev and CI cost nothing: SQL Server

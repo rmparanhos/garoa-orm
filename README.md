@@ -122,6 +122,24 @@ ulong written = await pg.BulkInsertAsync("people", people, commandTimeout: 600);
 The timeout flows to the underlying ADO.NET command for `Query`/`Execute`, to the PostgreSQL COPY
 writer for `BulkInsert`, and to `MySqlBulkCopy.BulkCopyTimeout` for the MySQL provider.
 
+### `IN` lists
+
+Pass a collection as a parameter and Garoa expands it for an `IN` clause — the `@ids` token becomes
+`(@ids0, @ids1, …)` with one parameter per element:
+
+```csharp
+List<Person> some = connection.Query<Person>(
+    "SELECT id, name FROM people WHERE id IN @ids", new { ids = new[] { 1, 2, 3 } });
+```
+
+- Only a non-string, non-`byte[]` `IEnumerable` is expanded; strings and byte arrays stay scalar.
+- An **empty** list is rewritten to a guaranteed-false predicate, so the query returns no rows instead
+  of throwing — `IN ()` (a syntax error) is never emitted.
+- It's a small token substitution, not a SQL parser. On **PostgreSQL** prefer `WHERE id = ANY(@ids)`
+  with a native array parameter — one cached plan regardless of list length, and empty arrays just
+  work — and skip expansion entirely. Expansion is most useful on **MySQL**/SQLite, which have no
+  array-parameter equivalent.
+
 ### Mapping rules
 
 - Column-to-member matching is case-insensitive and underscore-insensitive: `birth_date`
