@@ -91,6 +91,9 @@ await pg.BulkInsertAsync("people", people, columns: new[] { "name", "birth_date"
 
 // High-volume upsert (PostgreSQL): streams to a temp staging table, then one set-based
 // INSERT ... ON CONFLICT (id) DO UPDATE. Updates every written column except the keys by default.
+// The conflict keys must be unique within a batch — duplicates fail loudly ("ON CONFLICT DO UPDATE
+// command cannot affect row a second time") rather than being silently dropped, so deduplicate first
+// if your input may repeat a key.
 ulong upserted = await pg.BulkUpsertAsync("people", people, conflictKeys: new[] { "id" });
 ```
 
