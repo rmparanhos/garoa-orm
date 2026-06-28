@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Garoa.Benchmarks.MySqlBulkInsertBenchmarks-20260628-015149</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat)
+AMD EPYC 7763, 1 CPU, 4 logical and 2 physical cores
+.NET SDK 10.0.301
+  [Host]     : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+  Job-DMGYAW : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+</code></pre>
+<pre><code>Runtime=.NET 8.0  InvocationCount=1  IterationCount=10  
+UnrollFactor=1  WarmupCount=2  
+</code></pre>
+
+<table>
+<thead><tr><th>Method  </th><th>Rows</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Dapper</td><td>1000</td><td>22.77 ms</td><td>1.423 ms</td><td>0.847 ms</td><td>1.00</td><td>0.05</td><td>2794.9 KB</td><td>1.00</td>
+</tr><tr><td>ManualBulkCopy</td><td>1000</td><td>11.93 ms</td><td>1.829 ms</td><td>1.089 ms</td><td>0.52</td><td>0.05</td><td>477.17 KB</td><td>0.17</td>
+</tr><tr><td>GaroaBulk</td><td>1000</td><td>10.45 ms</td><td>0.513 ms</td><td>0.305 ms</td><td>0.46</td><td>0.02</td><td>111.56 KB</td><td>0.04</td>
+</tr><tr><td>Dapper</td><td>10000</td><td>145.54 ms</td><td>18.408 ms</td><td>12.176 ms</td><td>1.01</td><td>0.11</td><td>27936.61 KB</td><td>1.00</td>
+</tr><tr><td>ManualBulkCopy</td><td>10000</td><td>94.61 ms</td><td>18.463 ms</td><td>10.987 ms</td><td>0.65</td><td>0.09</td><td>5260.66 KB</td><td>0.19</td>
+</tr><tr><td>GaroaBulk</td><td>10000</td><td>88.72 ms</td><td>8.619 ms</td><td>5.129 ms</td><td>0.61</td><td>0.06</td><td>1060.78 KB</td><td>0.04</td>
+</tr></tbody></table>
+</body>
+</html>
