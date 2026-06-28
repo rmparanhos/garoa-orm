@@ -211,5 +211,13 @@ connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that
   stays **out** (SQL generation + a per-dialect matrix = bloat). Built **benchmark-first**:
   `PostgresBulkUpsertBenchmarks` confirmed the staging+COPY approach beats a chunked multi-row
   `INSERT ... ON CONFLICT` (~1.4x at 1k rows, ~2x at 10k) while allocating a near-constant few KB,
-  which justified the thicker API. MySQL (`ON DUPLICATE KEY UPDATE`) and SQL Server (`MERGE`) remain
-  deferred.
+  which justified the thicker API.
+  - [x] **MySQL** (`MySqlBulkUpsertExtensions.BulkUpsert`/`BulkUpsertAsync`) — staging via
+    `CREATE TEMPORARY TABLE ... AS SELECT ... WHERE 1=0`, filled with `MySqlBulkCopy`, then one
+    set-based `INSERT ... SELECT ... ON DUPLICATE KEY UPDATE col = VALUES(col)`. MySQL fires on **any**
+    unique/PK index and does not name the conflict columns, so `conflictKeys` is **not** emitted into
+    the SQL — it is kept only for call-site parity with PostgreSQL and to derive the default update set
+    (all written columns except the keys). An empty update set becomes `INSERT IGNORE` (MySQL has no
+    `DO NOTHING`). Covered by `MySqlBulkUpsertBenchmarks` (`Dapper` / `ManualStaging` / `GaroaBulk`,
+    same bulk gate as the insert path) and live integration tests.
+  - [ ] SQL Server (`MERGE`) remains deferred (needs the `Garoa.SqlServer` package first).
