@@ -59,6 +59,13 @@ List<int> ids = connection.Query<int>("SELECT id FROM people");
 Person? one = connection.QueryFirstOrDefault<Person>(
     "SELECT id, name, birth_date FROM people WHERE id = @Id LIMIT 1", new { Id = 1 });
 
+// QuerySingle / QuerySingleOrDefault assert the result is *unique*: they throw if more than one row
+// comes back (the OrDefault variant still allows zero). Stricter, and slightly costlier than
+// QueryFirst — they read a second row to enforce uniqueness — so prefer QueryFirst for a trusted
+// key lookup and reach for QuerySingle when "exactly one" is an invariant you want checked.
+Person exactlyOne = connection.QuerySingle<Person>(
+    "SELECT id, name, birth_date FROM people WHERE id = @Id", new { Id = 1 });
+
 // INSERT / UPDATE / DELETE — returns rows affected.
 int affected = connection.Execute(
     "UPDATE people SET name = @Name WHERE id = @Id",

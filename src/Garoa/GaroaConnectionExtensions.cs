@@ -97,6 +97,54 @@ public static class GaroaConnectionExtensions
         CancellationToken cancellationToken = default)
         => QueryFirstRowAsync<T>(connection, sql, param, commandTimeout, commandType, throwIfEmpty: false, cancellationToken);
 
+    /// <summary>
+    /// Returns the single row mapped to <typeparamref name="T"/>, throwing when the query yields no
+    /// rows or more than one. Stricter (and slightly costlier) than <see cref="QueryFirst{T}"/>: it
+    /// reads a second row to assert the result really is unique, so prefer <c>QueryFirst</c> for a
+    /// key lookup whose cardinality you already trust.
+    /// </summary>
+    public static T QuerySingle<T>(
+        this DbConnection connection,
+        string sql,
+        object? param = null,
+        int? commandTimeout = null,
+        CommandType? commandType = null)
+        => QuerySingleRow<T>(connection, sql, param, commandTimeout, commandType, throwIfEmpty: true)!;
+
+    /// <summary>
+    /// Returns the single row mapped to <typeparamref name="T"/>, or <see langword="default"/>
+    /// (<see langword="null"/> for a reference type) when the query yields no rows. Still throws when
+    /// the query yields more than one row.
+    /// </summary>
+    public static T? QuerySingleOrDefault<T>(
+        this DbConnection connection,
+        string sql,
+        object? param = null,
+        int? commandTimeout = null,
+        CommandType? commandType = null)
+        => QuerySingleRow<T>(connection, sql, param, commandTimeout, commandType, throwIfEmpty: false);
+
+    /// <summary>Asynchronously returns the single row, throwing when there are no rows or more than one.</summary>
+    public static async Task<T> QuerySingleAsync<T>(
+        this DbConnection connection,
+        string sql,
+        object? param = null,
+        int? commandTimeout = null,
+        CommandType? commandType = null,
+        CancellationToken cancellationToken = default)
+        => (await QuerySingleRowAsync<T>(connection, sql, param, commandTimeout, commandType, throwIfEmpty: true, cancellationToken)
+            .ConfigureAwait(false))!;
+
+    /// <summary>Asynchronously returns the single row, or <see langword="default"/> when there are none; throws on more than one.</summary>
+    public static Task<T?> QuerySingleOrDefaultAsync<T>(
+        this DbConnection connection,
+        string sql,
+        object? param = null,
+        int? commandTimeout = null,
+        CommandType? commandType = null,
+        CancellationToken cancellationToken = default)
+        => QuerySingleRowAsync<T>(connection, sql, param, commandTimeout, commandType, throwIfEmpty: false, cancellationToken);
+
     private static T? QueryFirstRow<T>(
         DbConnection connection,
         string sql,
@@ -166,8 +214,93 @@ public static class GaroaConnectionExtensions
         }
     }
 
+    // Like QueryFirstRow, but asserts a *single* row: it must NOT hint SingleRow (that would stop the
+    // provider after one row), because it reads a second row to reject a result of more than one.
+    private static T? QuerySingleRow<T>(
+        DbConnection connection,
+        string sql,
+        object? param,
+        int? commandTimeout,
+        CommandType? commandType,
+        bool throwIfEmpty)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        bool wasClosed = connection.State == ConnectionState.Closed;
+        using DbCommand command = CreateCommand(connection, sql, param, commandTimeout, commandType);
+        try
+        {
+            if (wasClosed)
+                connection.Open();
+
+            using DbDataReader reader = command.ExecuteReader(CommandBehavior.SingleResult);
+            if (!reader.Read())
+                return throwIfEmpty ? throw NoSingleRow() : default;
+
+            T result = Mapper<T>.ForReader(reader)(reader);
+            if (reader.Read())
+                throw MoreThanOneRow();
+
+            return result;
+        }
+        finally
+        {
+            if (wasClosed)
+                connection.Close();
+        }
+    }
+
+    private static async Task<T?> QuerySingleRowAsync<T>(
+        DbConnection connection,
+        string sql,
+        object? param,
+        int? commandTimeout,
+        CommandType? commandType,
+        bool throwIfEmpty,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        bool wasClosed = connection.State == ConnectionState.Closed;
+        DbCommand command = CreateCommand(connection, sql, param, commandTimeout, commandType);
+        await using (command.ConfigureAwait(false))
+        {
+            try
+            {
+                if (wasClosed)
+                    await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+                DbDataReader reader = await command
+                    .ExecuteReaderAsync(CommandBehavior.SingleResult, cancellationToken)
+                    .ConfigureAwait(false);
+                await using (reader.ConfigureAwait(false))
+                {
+                    if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        return throwIfEmpty ? throw NoSingleRow() : default;
+
+                    T result = Mapper<T>.ForReader(reader)(reader);
+                    if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        throw MoreThanOneRow();
+
+                    return result;
+                }
+            }
+            finally
+            {
+                if (wasClosed)
+                    await connection.CloseAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
     private static InvalidOperationException NoRows() =>
         new("QueryFirst expected at least one row, but the query returned none.");
+
+    private static InvalidOperationException NoSingleRow() =>
+        new("QuerySingle expected exactly one row, but the query returned none.");
+
+    private static InvalidOperationException MoreThanOneRow() =>
+        new("QuerySingle expected exactly one row, but the query returned more than one.");
 
     /// <summary>Executes a non-query statement (INSERT/UPDATE/DELETE) and returns rows affected.</summary>
     public static int Execute(
