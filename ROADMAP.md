@@ -173,11 +173,13 @@ connection-lifetime handling, `ObjectDataReader`/`BulkColumnSet`). Anything that
   bloat risk; first candidate. Note: `SingleRow` is a client-side hint, **not** `LIMIT 1`/`TOP 1` —
   for the server to actually stop early, put the limit in your SQL. The method never injects it
   (that would be SQL rewriting).
-- [ ] **`QuerySingle` / `QuerySingleOrDefault`** — deferred until asked. They assert *exactly one*
-  row, which is a narrower need and costs an extra fetch (they must read a **second** row via
-  `SingleResult` just to reject `>1`). For a PK lookup you already trust the cardinality, so
-  `QueryFirstOrDefault` is the cheaper, idiomatic choice; `Query<T>` already lets you check `.Count`
-  and throw your own way. Same shared core as the `First*` pair when it lands.
+- [x] **`QuerySingle` / `QuerySingleOrDefault`** (sync + async) — **implemented**. They assert
+  *exactly one* row. Unlike the `First*` pair they do **not** hint `CommandBehavior.SingleRow` (that
+  would stop the provider after one row); they read a **second** row via `SingleResult` to reject a
+  result of `>1` — the extra fetch is the cost of the stricter guarantee. `QuerySingle` throws on zero
+  or many; `QuerySingleOrDefault` returns `default(T)` on zero but still throws on many. Thin shell
+  over `Mapper<T>` (own private core, mirroring `QueryFirstRow`). For a PK lookup whose cardinality you
+  already trust, `QueryFirst` stays the cheaper, idiomatic choice.
 - [x] **`IN` expansion** (`WHERE id IN @ids`) — scoped tightly so it never becomes a SQL rewriter.
   Implemented in `ParameterBinder`: a parameter whose value is a non-string, non-`byte[]`
   `IEnumerable` has its `@name` token replaced with `(@name0, @name1, …)` and one parameter added per
