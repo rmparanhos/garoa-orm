@@ -35,8 +35,8 @@ Pre-release. The v1 surface is intentionally tiny — see [`ROADMAP.md`](ROADMAP
 | Package            | Contents                                                              |
 | ------------------ | -------------------------------------------------------------------- |
 | `Garoa`            | Core: `Query`/`Execute`, the mapper, and the bulk-insert plumbing.   |
-| `Garoa.PostgreSQL` | `BulkInsert` for PostgreSQL via Npgsql's binary COPY protocol.       |
-| `Garoa.MySql`      | `BulkInsert` for MySQL via MySqlConnector's `MySqlBulkCopy`.         |
+| `Garoa.PostgreSQL` | `BulkInsert` / `BulkUpsert` for PostgreSQL via Npgsql's binary COPY.  |
+| `Garoa.MySql`      | `BulkInsert` / `BulkUpsert` for MySQL via MySqlConnector's `MySqlBulkCopy`. |
 
 ## Usage
 
@@ -102,6 +102,12 @@ await pg.BulkInsertAsync("people", people, columns: new[] { "name", "birth_date"
 // command cannot affect row a second time") rather than being silently dropped, so deduplicate first
 // if your input may repeat a key.
 ulong upserted = await pg.BulkUpsertAsync("people", people, conflictKeys: new[] { "id" });
+
+// High-volume upsert (MySQL): same call shape, via staging + INSERT ... ON DUPLICATE KEY UPDATE.
+// Note: MySQL fires on ANY unique/PK index, so conflictKeys is not put into the SQL — it only picks
+// the default update columns (all written columns except the keys). An empty update set uses
+// INSERT IGNORE. Needs AllowLoadLocalInfile=True, like BulkInsert.
+long mysqlUpserted = await mysql.BulkUpsertAsync("people", people, conflictKeys: new[] { "id" });
 ```
 
 > **Write-side column names follow a convention.** Unlike `Query<T>` — which has the result set's
