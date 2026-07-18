@@ -76,6 +76,45 @@ public class PostgresBulkUpsertTests
     }
 
     [SkippableFact]
+    public void BulkUpsert_matches_conflict_keys_like_the_columns_argument()
+    {
+        using NpgsqlConnection db = Open();
+        CreateSeeded(db);
+
+        var rows = new[] { new Account { Id = 1, Name = "by-member-name", Balance = 111 } };
+
+        // "Id" (member-style casing) must resolve to the written column "id", the same
+        // case/underscore-insensitive matching the explicit `columns` argument gets.
+        db.BulkUpsert("accounts", rows, conflictKeys: new[] { "Id" });
+
+        Account a = db.QueryFirst<Account>("SELECT id, name, balance FROM accounts WHERE id = 1;");
+        Assert.Equal("by-member-name", a.Name);
+    }
+
+    [SkippableFact]
+    public void BulkUpsert_inside_a_transaction_surfaces_the_real_error_not_the_cleanup_failure()
+    {
+        using NpgsqlConnection db = Open();
+        CreateSeeded(db);
+        using NpgsqlTransaction tx = db.BeginTransaction();
+
+        // Duplicate conflict keys in one batch: the merge fails with 21000 ("ON CONFLICT DO UPDATE
+        // command cannot affect row a second time"). Inside an aborted transaction the staging DROP
+        // also fails (25P02) — it must not replace the real error.
+        var rows = new[]
+        {
+            new Account { Id = 1, Name = "dup-a", Balance = 1 },
+            new Account { Id = 1, Name = "dup-b", Balance = 2 },
+        };
+
+        var ex = Assert.Throws<PostgresException>(
+            () => db.BulkUpsert("accounts", rows, conflictKeys: new[] { "id" }));
+
+        Assert.Equal("21000", ex.SqlState);
+        tx.Rollback();
+    }
+
+    [SkippableFact]
     public async Task BulkUpsertAsync_inserts_and_updates()
     {
         await using NpgsqlConnection db = Open();

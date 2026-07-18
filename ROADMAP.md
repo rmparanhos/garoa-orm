@@ -40,8 +40,10 @@ the stricter `QuerySingle*` remain deferred.)
 ### Result mapping
 
 - [x] Expression trees compiled at runtime, cached by type + columns.
-- [x] Use `DbDataReader.GetFieldValue<T>()` directly — delegate type handling to the
-  provider (natively resolves DateOnly/TimeOnly on PostgreSQL).
+- [x] Typed reader getters (`GetInt32`, `GetString`, …) for BCL types — JIT-inlined, closing the
+  large-result-set gap to Dapper's IL mapper — with `DbDataReader.GetFieldValue<T>()` for
+  provider-resolved types (natively resolves DateOnly/TimeOnly on PostgreSQL). The runtime and
+  source-generated mappers share this strategy.
 - [x] No IL emission.
 - [x] Error messages identify the **correct** column by name + ordinal on a failed
   conversion (fixes the Dapper bug where the previous column was reported).
@@ -135,6 +137,33 @@ the stricter `QuerySingle*` remain deferred.)
     multi-row insert, not a per-row `Execute` loop (an anti-pattern, deliberately not measured). The
     CI gate `GAROA_BULK_THRESHOLD` holds `GaroaBulk` within `1.50x` of the Dapper baseline (expected
     well under 1; the bound is loose because MySQL bulk-copy at the 1000-row batch is noisy on CI).
+
+---
+
+## Code-review hardening (v0.2.x)
+
+A full-codebase review produced these fixes — correctness first, then performance. None changed the
+public API shape.
+
+- [x] **Structural bulk cache key** (`BulkCacheKey`): `BulkColumnSet<T>`/`NpgsqlCopyWriter<T>` were
+  keyed by string concatenation whose separator was a **raw `\x01` control byte in the source** —
+  invisible in every editor/diff and indistinguishable from an empty separator (which would make
+  `["user","name"]` and `["username"]` collide). Replaced with an element-wise structural key
+  (mirroring `MapperKey`), removing the landmine and the per-call closure/string allocations.
+- [x] **Best-effort staging drop in `BulkUpsert`** (PG + MySQL, sync + async): a failing cleanup
+  `DROP` (aborted enclosing transaction → `25P02`, broken connection) no longer masks the real
+  exception; the staging temp table dies with the session anyway. Regression-tested against live
+  PostgreSQL inside an explicit transaction.
+- [x] **`conflictKeys` matched like `columns`**: resolved case- and underscore-insensitively against
+  the written columns (shared `ConflictKeys.Resolve` in core), so `conflictKeys: ["UserId"]` finds
+  the emitted snake_case column `user_id`; unknown keys throw a clear `GaroaMappingException`.
+- [x] **Typed getters in the runtime mapper**: `MapperFactory` now emits `GetInt32`/`GetString`/…
+  for BCL types (same list as the source generator) instead of `GetFieldValue<T>` for everything —
+  the generic dispatch was the runtime mapper's large-result-set gap (and the source of the SQLite
+  benchmark noise that forced the 1.40x gate).
+- [x] **Cached parameter binder**: property accessors compiled once per parameter-object type
+  (expression trees, like every other hot path) — no more `GetProperties`/reflective `GetValue` per
+  call. The `IN`-expansion token regex is also cached per property name.
 
 ---
 

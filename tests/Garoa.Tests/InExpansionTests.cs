@@ -126,6 +126,22 @@ public class InExpansionTests
     }
 
     [Fact]
+    public void Binding_stays_correct_across_calls_with_the_same_parameter_shape()
+    {
+        using SqliteConnection db = NewDatabase();
+
+        // Two calls with the same anonymous-type shape hit the cached compiled accessors;
+        // each call must still bind its own instance's values.
+        List<Widget> first = db.Query<Widget>(
+            "SELECT id, name FROM widgets WHERE id IN @ids;", new { ids = new[] { 1 } });
+        List<Widget> second = db.Query<Widget>(
+            "SELECT id, name FROM widgets WHERE id IN @ids;", new { ids = new[] { 3, 4 } });
+
+        Assert.Equal(1, Assert.Single(first).Id);
+        Assert.Equal(new long[] { 3, 4 }, second.Select(w => w.Id));
+    }
+
+    [Fact]
     public void The_same_list_token_used_twice_expands_both_occurrences()
     {
         using SqliteConnection db = NewDatabase();

@@ -22,7 +22,7 @@ public static class NpgsqlBulkUpsertExtensions
     /// <param name="connection">An open or closed connection; if closed it is opened and closed again.</param>
     /// <param name="table">Target table, used verbatim (qualify/quote it yourself if needed).</param>
     /// <param name="rows">The rows to upsert; streamed one at a time, never fully materialised.</param>
-    /// <param name="conflictKeys">Columns of the unique/primary-key constraint to conflict on (named in <c>ON CONFLICT</c>).</param>
+    /// <param name="conflictKeys">Columns of the unique/primary-key constraint to conflict on (named in <c>ON CONFLICT</c>). Matched case- and underscore-insensitively against the written columns, like <paramref name="columns"/>.</param>
     /// <param name="updateColumns">Columns to overwrite on conflict; when null, every written column except the conflict keys. An empty set becomes <c>DO NOTHING</c>.</param>
     /// <param name="columns">Columns to write; when null, all readable members of <typeparamref name="T"/> are used.</param>
     /// <param name="commandTimeout">Timeout in seconds for each statement; when null, falls back to <see cref="GaroaDefaults.CommandTimeoutSeconds"/>.</param>
@@ -76,7 +76,10 @@ public static class NpgsqlBulkUpsertExtensions
             }
             finally
             {
-                Exec(connection, $"DROP TABLE IF EXISTS {NpgsqlBulkInsertExtensions.Quote(staging)}", timeout);
+                // Best-effort: the staging TEMP table dies with the session anyway. A failing drop
+                // (aborted enclosing transaction, broken connection) must never mask the real error.
+                try { Exec(connection, $"DROP TABLE IF EXISTS {NpgsqlBulkInsertExtensions.Quote(staging)}", timeout); }
+                catch { /* best-effort cleanup */ }
             }
         }
         finally
@@ -140,8 +143,14 @@ public static class NpgsqlBulkUpsertExtensions
             }
             finally
             {
-                await ExecAsync(connection, $"DROP TABLE IF EXISTS {NpgsqlBulkInsertExtensions.Quote(staging)}", timeout, cancellationToken)
-                    .ConfigureAwait(false);
+                // Best-effort: the staging TEMP table dies with the session anyway. A failing drop
+                // (aborted enclosing transaction, broken connection) must never mask the real error.
+                try
+                {
+                    await ExecAsync(connection, $"DROP TABLE IF EXISTS {NpgsqlBulkInsertExtensions.Quote(staging)}", timeout, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch { /* best-effort cleanup */ }
             }
         }
         finally
@@ -184,11 +193,16 @@ public static class NpgsqlBulkUpsertExtensions
         string table, string staging, string[] writtenColumns, IReadOnlyList<string> conflictKeys, IReadOnlyList<string>? updateColumns)
     {
         string cols = ColumnList(writtenColumns);
-        string keys = string.Join(", ", conflictKeys.Select(NpgsqlBulkInsertExtensions.Quote));
+
+        // Conflict keys are matched against the written columns with the same case/underscore-
+        // insensitive rules as the explicit `columns` argument, so `conflictKeys: ["UserId"]` finds
+        // the emitted snake_case column `user_id`. The resolved (written) name goes into the SQL.
+        string[] resolvedKeys = Garoa.Bulk.ConflictKeys.Resolve(writtenColumns, conflictKeys);
+        string keys = string.Join(", ", resolvedKeys.Select(NpgsqlBulkInsertExtensions.Quote));
 
         // Default: overwrite every written column that isn't part of the conflict key.
-        string[] updates = (updateColumns
-            ?? writtenColumns.Where(c => !conflictKeys.Contains(c, StringComparer.Ordinal)).ToArray()).ToArray();
+        string[] updates = updateColumns?.ToArray()
+            ?? writtenColumns.Where(c => !resolvedKeys.Contains(c, StringComparer.Ordinal)).ToArray();
 
         string action = updates.Length == 0
             ? "DO NOTHING"

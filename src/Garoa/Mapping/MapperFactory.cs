@@ -6,8 +6,10 @@ namespace Garoa.Mapping;
 
 /// <summary>
 /// Builds compiled <c>Func&lt;DbDataReader, T&gt;</c> mappers from a result-set's column layout.
-/// Mappers are produced with expression trees (no IL emission) and read each value through
-/// <see cref="DbDataReader.GetFieldValue{T}(int)"/>, delegating type handling to the provider.
+/// Mappers are produced with expression trees (no IL emission). BCL types read through the typed
+/// reader getters (<c>GetInt32</c>, <c>GetString</c>, …), which the JIT inlines; provider-resolved
+/// types (DateOnly, TimeOnly, …) read through <see cref="DbDataReader.GetFieldValue{T}(int)"/>,
+/// delegating type handling to the provider — the same strategy as the source-generated mapper.
 /// </summary>
 internal static class MapperFactory
 {
@@ -16,6 +18,30 @@ internal static class MapperFactory
 
     private static readonly MethodInfo IsDbNullMethod =
         typeof(DbDataReader).GetMethod(nameof(DbDataReader.IsDBNull), new[] { typeof(int) })!;
+
+    // Typed reader getters for the types the BCL exposes one for — the same list the source
+    // generator uses. The JIT inlines these, unlike the generic GetFieldValue<T> dispatch, which is
+    // where the runtime mapper used to trail Dapper's IL mapper on large result sets. Everything
+    // else (DateOnly, TimeOnly, DateTimeOffset, byte[], custom types) still goes through
+    // GetFieldValue<T> so the provider resolves it — the delegation that motivates Garoa.
+    private static readonly Dictionary<Type, MethodInfo> TypedGetters = new()
+    {
+        [typeof(bool)] = Getter(nameof(DbDataReader.GetBoolean)),
+        [typeof(byte)] = Getter(nameof(DbDataReader.GetByte)),
+        [typeof(char)] = Getter(nameof(DbDataReader.GetChar)),
+        [typeof(short)] = Getter(nameof(DbDataReader.GetInt16)),
+        [typeof(int)] = Getter(nameof(DbDataReader.GetInt32)),
+        [typeof(long)] = Getter(nameof(DbDataReader.GetInt64)),
+        [typeof(float)] = Getter(nameof(DbDataReader.GetFloat)),
+        [typeof(double)] = Getter(nameof(DbDataReader.GetDouble)),
+        [typeof(decimal)] = Getter(nameof(DbDataReader.GetDecimal)),
+        [typeof(string)] = Getter(nameof(DbDataReader.GetString)),
+        [typeof(DateTime)] = Getter(nameof(DbDataReader.GetDateTime)),
+        [typeof(Guid)] = Getter(nameof(DbDataReader.GetGuid)),
+    };
+
+    private static MethodInfo Getter(string name) =>
+        typeof(DbDataReader).GetMethod(name, new[] { typeof(int) })!;
 
     private static readonly MethodInfo CreateExceptionMethod =
         typeof(MapperFactory).GetMethod(nameof(CreateMappingException), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -92,6 +118,10 @@ internal static class MapperFactory
             Type numeric = Enum.GetUnderlyingType(underlying);
             Expression raw = Expression.Call(reader, GetFieldValueMethod.MakeGenericMethod(numeric), ord);
             value = Expression.Convert(raw, underlying);
+        }
+        else if (TypedGetters.TryGetValue(underlying, out MethodInfo? typedGetter))
+        {
+            value = Expression.Call(reader, typedGetter, ord);
         }
         else
         {

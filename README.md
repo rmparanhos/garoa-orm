@@ -8,9 +8,11 @@ Portuguese for *drizzle*.
 
 ## Why Garoa
 
-Garoa maps result sets with **runtime-compiled expression trees** (no IL emission) and reads
-every value through `DbDataReader.GetFieldValue<T>()`, delegating type handling to the
-provider. That design choice solves several long-standing micro-ORM pain points directly:
+Garoa maps result sets with **runtime-compiled expression trees** (no IL emission). BCL types
+read through the typed reader getters (`GetInt64`, `GetString`, …), which the JIT inlines — the
+same speed class as a hand-written mapper. Types the provider must resolve itself (`DateOnly`,
+`TimeOnly`, …) read through `DbDataReader.GetFieldValue<T>()`, delegating type handling to the
+provider. That split solves several long-standing micro-ORM pain points directly:
 
 - **`DateOnly` / `TimeOnly` work natively** on PostgreSQL (and anywhere the provider supports
   them) — no manual type handlers required.
@@ -22,13 +24,16 @@ provider. That design choice solves several long-standing micro-ORM pain points 
 
 Pre-release. The v1 surface is intentionally tiny — see [`ROADMAP.md`](ROADMAP.md).
 
-| Operation              | Method                          | Notes                          |
-| ---------------------- | ------------------------------- | ------------------------------ |
-| SELECT                 | `Query<T>` → `List<T>`          | Cached mapper                  |
-| INSERT/UPDATE/DELETE   | `Execute`                       | Returns rows affected          |
-| Bulk insert            | `BulkInsert<T>(IEnumerable<T>)` | Streaming, never in memory     |
+| Operation              | Method                             | Notes                                        |
+| ---------------------- | ---------------------------------- | -------------------------------------------- |
+| SELECT                 | `Query<T>` → `List<T>`             | Cached mapper; `IN @ids` lists expanded      |
+| Single row             | `QueryFirst[OrDefault]<T>`         | One-row fetch, no list built                 |
+| Exactly one row        | `QuerySingle[OrDefault]<T>`        | Throws when more than one row comes back     |
+| INSERT/UPDATE/DELETE   | `Execute`                          | Returns rows affected                        |
+| Bulk insert            | `BulkInsert<T>(IEnumerable<T>)`    | Streaming, never in memory                   |
+| Bulk upsert            | `BulkUpsert<T>(…, conflictKeys)`   | PostgreSQL + MySQL, staging + set-based merge|
 
-`Query<T>`, `Execute`, `BulkInsert<T>` and their `…Async` counterparts are implemented today.
+All of the above ship with `…Async` counterparts.
 
 ## Packages
 
@@ -187,10 +192,9 @@ List<Person> people = connection.Query<Person>("SELECT id, name, birth_date FROM
 What you get:
 
 - **No runtime `.Compile()`** — the mapper ships as plain compiled code, so the first query
-  pays nothing to build it.
-- **Typed reader getters** (`GetInt64`, `GetString`, …) for BCL types, which the JIT inlines;
-  `GetFieldValue<T>` is still used for provider-resolved types like `DateOnly`/`TimeOnly`, so
-  that advantage is preserved.
+  pays nothing to build it. (Both mappers use the same typed-getter strategy for BCL types and
+  `GetFieldValue<T>` for provider-resolved ones like `DateOnly`/`TimeOnly` — the generator's edge
+  is skipping the runtime compilation, not a different read path.)
 - **Native AOT / trimming friendly** — no expression-tree compilation at runtime.
 - **Identical semantics** to the runtime mapper: same case/underscore matching, `[Column]`,
   nullable and enum handling, and the same column-accurate error messages.
@@ -203,9 +207,12 @@ public parameterless constructor is required; types without one fall back to the
 ## Performance
 
 Garoa is benchmarked against Dapper in the same run (Dapper as the `[Baseline]`). It is faster
-on single-row reads, within ~12% of Dapper's IL mapper on large result sets, and consistently
-allocates ~25–31% less memory. See [`benchmarks/`](benchmarks/README.md) for numbers and how to
-run them; CI tracks the ratio on every push to `main` and fails on a regression.
+on single-row reads, competitive with Dapper's IL mapper on large result sets (the runtime and
+generated mappers share the same typed-getter read path), and consistently allocates ~25–31%
+less memory. The bulk paths run at the hand-written floor: PostgreSQL COPY with zero boxing,
+2–3× faster than a multi-row `INSERT` through Dapper. See [`benchmarks/`](benchmarks/README.md)
+for numbers and how to run them; CI tracks the ratio on every push to `main` and fails on a
+regression.
 
 ## Building
 

@@ -26,6 +26,27 @@ public class BulkCoreTests
         Active = 1,
     }
 
+    private sealed class Login
+    {
+        public string? User { get; set; }
+        public string? Name { get; set; }
+        public string? UserName { get; set; }
+    }
+
+    [Fact]
+    public void Cache_key_is_structural_so_different_column_lists_never_collide()
+    {
+        // ["user","name"] and ["username"] concatenate to the same string; a string-joined cache
+        // key would hand the second call the first call's two-column set.
+        BulkColumnSet<Login> two = BulkColumnSet<Login>.Get(new[] { "user", "name" });
+        BulkColumnSet<Login> one = BulkColumnSet<Login>.Get(new[] { "username" });
+
+        Assert.Equal(2, two.Count);
+        Assert.Equal(new[] { "user", "name" }, two.ColumnNames);
+        Assert.Equal(1, one.Count);
+        Assert.Equal(new[] { "username" }, one.ColumnNames);
+    }
+
     [Fact]
     public void Explicit_columns_drive_order_and_selection()
     {
