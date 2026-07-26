@@ -18,7 +18,7 @@ namespace Garoa.Bulk;
 /// </remarks>
 internal sealed class BulkColumnSet<T>
 {
-    private static readonly ConcurrentDictionary<string, BulkColumnSet<T>> Cache = new();
+    private static readonly ConcurrentDictionary<BulkCacheKey, BulkColumnSet<T>> Cache = new();
 
     private readonly Action<T, object?[]> _fill;
 
@@ -42,9 +42,9 @@ internal sealed class BulkColumnSet<T>
 
     public static BulkColumnSet<T> Get(IReadOnlyList<string>? columns)
     {
-        string key = columns is null ? "*" : string.Join("", columns);
-        // Fold the naming convention into the key: emitted column names depend on it.
-        return Cache.GetOrAdd($"{key}|{(int)GaroaDefaults.BulkNamingConvention}", _ => Build(columns));
+        // The naming convention is folded into the key: emitted column names depend on it.
+        var key = new BulkCacheKey(columns, GaroaDefaults.BulkNamingConvention);
+        return Cache.GetOrAdd(key, static (_, cols) => Build(cols), columns);
     }
 
     private static BulkColumnSet<T> Build(IReadOnlyList<string>? columns)

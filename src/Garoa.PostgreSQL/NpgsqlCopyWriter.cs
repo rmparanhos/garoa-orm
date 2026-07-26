@@ -17,7 +17,7 @@ namespace Garoa;
 /// </summary>
 internal sealed class NpgsqlCopyWriter<T>
 {
-    private static readonly ConcurrentDictionary<string, NpgsqlCopyWriter<T>> Cache = new();
+    private static readonly ConcurrentDictionary<BulkCacheKey, NpgsqlCopyWriter<T>> Cache = new();
 
     // The single-argument generic NpgsqlBinaryImporter.Write<TValue>(TValue) overload.
     private static readonly MethodInfo WriteGeneric = typeof(NpgsqlBinaryImporter).GetMethods()
@@ -45,9 +45,8 @@ internal sealed class NpgsqlCopyWriter<T>
     public static NpgsqlCopyWriter<T> Get(IReadOnlyList<string>? columns)
     {
         // Keyed by column layout + naming convention, since the latter changes the emitted columns.
-        string key = (columns is null ? "*" : string.Join("", columns))
-            + $"|{(int)GaroaDefaults.BulkNamingConvention}";
-        return Cache.GetOrAdd(key, _ => Build(columns));
+        var key = new BulkCacheKey(columns, GaroaDefaults.BulkNamingConvention);
+        return Cache.GetOrAdd(key, static (_, cols) => Build(cols), columns);
     }
 
     private static NpgsqlCopyWriter<T> Build(IReadOnlyList<string>? columns)

@@ -90,8 +90,10 @@ Results land in `benchmarks/Garoa.Benchmarks/BenchmarkDotNet.Artifacts/results/`
 CI runs these on every push to `main` and on every PR targeting `main`, and fails if Garoa
 regresses past the threshold. Two gates run via [`check_threshold.py`](check_threshold.py):
 
-- **Read mapping** — `Garoa` mean must stay within `1.30x` of `Dapper`'s mean
-  (`GAROA_BENCH_THRESHOLD`).
+- **Read mapping** — `Garoa` mean must stay within `1.40x` of `Dapper`'s mean
+  (`GAROA_BENCH_THRESHOLD`; loosened from 1.30x when the runtime mapper still read everything via
+  `GetFieldValue<T>` and swung ~1.1–1.32x run-to-run on SQLite — with the typed-getter read path it
+  should sit well inside the bound).
 - **Bulk insert** — `GaroaBulk` mean must stay within `1.50x` of the `Dapper` multi-row INSERT mean
   (`GAROA_BULK_THRESHOLD`, `--baseline Dapper --candidate GaroaBulk`). This is a loose safety net; in
   practice the ratio is well under 1. The bound is deliberately loose because MySQL bulk-copy at the

@@ -29,7 +29,7 @@ public static class MySqlBulkUpsertExtensions
     /// <param name="connection">An open or closed connection; if closed it is opened and closed again.</param>
     /// <param name="table">Target table name.</param>
     /// <param name="rows">The rows to upsert; streamed one at a time, never fully materialised.</param>
-    /// <param name="conflictKeys">The unique/PK columns; not emitted into the SQL (MySQL fires on any unique index), only used to derive the default update columns.</param>
+    /// <param name="conflictKeys">The unique/PK columns; not emitted into the SQL (MySQL fires on any unique index), only used to derive the default update columns. Matched case- and underscore-insensitively against the written columns, like <paramref name="columns"/>.</param>
     /// <param name="updateColumns">Columns to overwrite on conflict; when null, every written column except the conflict keys. An empty set becomes <c>INSERT IGNORE</c>.</param>
     /// <param name="columns">Columns to write; when null, all readable members of <typeparamref name="T"/> are used.</param>
     /// <param name="commandTimeout">Timeout in seconds for each step; when null, falls back to <see cref="GaroaDefaults.CommandTimeoutSeconds"/>.</param>
@@ -65,7 +65,10 @@ public static class MySqlBulkUpsertExtensions
             }
             finally
             {
-                Exec(connection, $"DROP TEMPORARY TABLE IF EXISTS {Quote(staging)}", timeout);
+                // Best-effort: the staging TEMPORARY table dies with the session anyway. A failing
+                // drop (broken connection, invalid state) must never mask the real error.
+                try { Exec(connection, $"DROP TEMPORARY TABLE IF EXISTS {Quote(staging)}", timeout); }
+                catch { /* best-effort cleanup */ }
             }
         }
         finally
@@ -110,8 +113,14 @@ public static class MySqlBulkUpsertExtensions
             }
             finally
             {
-                await ExecAsync(connection, $"DROP TEMPORARY TABLE IF EXISTS {Quote(staging)}", timeout, cancellationToken)
-                    .ConfigureAwait(false);
+                // Best-effort: the staging TEMPORARY table dies with the session anyway. A failing
+                // drop (broken connection, invalid state) must never mask the real error.
+                try
+                {
+                    await ExecAsync(connection, $"DROP TEMPORARY TABLE IF EXISTS {Quote(staging)}", timeout, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch { /* best-effort cleanup */ }
             }
         }
         finally
@@ -163,9 +172,15 @@ public static class MySqlBulkUpsertExtensions
     {
         string cols = ColumnList(writtenColumns);
 
+        // Conflict keys are matched against the written columns with the same case/underscore-
+        // insensitive rules as the explicit `columns` argument (they never reach the SQL on MySQL —
+        // ON DUPLICATE KEY UPDATE fires on any unique index — but the default update set must
+        // exclude the actual written key columns).
+        string[] resolvedKeys = ConflictKeys.Resolve(writtenColumns, conflictKeys);
+
         // Default: overwrite every written column that isn't part of the conflict key.
-        string[] updates = (updateColumns
-            ?? writtenColumns.Where(c => !conflictKeys.Contains(c, StringComparer.Ordinal)).ToArray()).ToArray();
+        string[] updates = updateColumns?.ToArray()
+            ?? writtenColumns.Where(c => !resolvedKeys.Contains(c, StringComparer.Ordinal)).ToArray();
 
         // No update columns -> MySQL has no DO NOTHING; INSERT IGNORE skips the conflicting rows.
         if (updates.Length == 0)
