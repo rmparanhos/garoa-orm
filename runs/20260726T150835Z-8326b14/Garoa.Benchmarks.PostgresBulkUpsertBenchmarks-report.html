@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Garoa.Benchmarks.PostgresBulkUpsertBenchmarks-20260726-150446</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat)
+Intel Xeon 6973P-C, 1 CPU, 4 logical and 2 physical cores
+.NET SDK 10.0.302
+  [Host]     : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX-512F+CD+BW+DQ+VL+VBMI
+  Job-FDCKSM : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX-512F+CD+BW+DQ+VL+VBMI
+</code></pre>
+<pre><code>Runtime=.NET 8.0  InvocationCount=1  IterationCount=10  
+UnrollFactor=1  WarmupCount=2  
+</code></pre>
+
+<table>
+<thead><tr><th>Method </th><th>Rows</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Median</th><th>Ratio</th><th>RatioSD</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Dapper</td><td>1000</td><td>16.359 ms</td><td>3.2952 ms</td><td>2.1796 ms</td><td>15.353 ms</td><td>1.01</td><td>0.18</td><td>2656.59 KB</td><td>1.000</td>
+</tr><tr><td>ManualStaging</td><td>1000</td><td>8.260 ms</td><td>1.5103 ms</td><td>0.8988 ms</td><td>8.448 ms</td><td>0.51</td><td>0.08</td><td>5.05 KB</td><td>0.002</td>
+</tr><tr><td>GaroaBulk</td><td>1000</td><td>8.108 ms</td><td>0.9542 ms</td><td>0.5678 ms</td><td>7.982 ms</td><td>0.50</td><td>0.07</td><td>9.41 KB</td><td>0.004</td>
+</tr><tr><td>Dapper</td><td>10000</td><td>193.252 ms</td><td>159.9169 ms</td><td>105.7751 ms</td><td>224.453 ms</td><td>1.39</td><td>1.17</td><td>26554.97 KB</td><td>1.000</td>
+</tr><tr><td>ManualStaging</td><td>10000</td><td>72.444 ms</td><td>90.9464 ms</td><td>54.1208 ms</td><td>54.946 ms</td><td>0.52</td><td>0.52</td><td>7.34 KB</td><td>0.000</td>
+</tr><tr><td>GaroaBulk</td><td>10000</td><td>109.332 ms</td><td>129.1529 ms</td><td>85.4266 ms</td><td>63.947 ms</td><td>0.79</td><td>0.82</td><td>11.38 KB</td><td>0.000</td>
+</tr></tbody></table>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Garoa.Benchmarks.PostgresBulkInsertBenchmarks-20260726-150438</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat)
+Intel Xeon 6973P-C, 1 CPU, 4 logical and 2 physical cores
+.NET SDK 10.0.302
+  [Host]     : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX-512F+CD+BW+DQ+VL+VBMI
+  Job-FDCKSM : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX-512F+CD+BW+DQ+VL+VBMI
+</code></pre>
+<pre><code>Runtime=.NET 8.0  InvocationCount=1  IterationCount=10  
+UnrollFactor=1  WarmupCount=2  
+</code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>Rows</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Dapper</td><td>1000</td><td>17.470 ms</td><td>5.262 ms</td><td>3.4808 ms</td><td>1.04</td><td>0.28</td><td>2772.15 KB</td><td>1.000</td>
+</tr><tr><td>ManualCopy</td><td>1000</td><td>5.696 ms</td><td>1.057 ms</td><td>0.6991 ms</td><td>0.34</td><td>0.07</td><td>2.73 KB</td><td>0.001</td>
+</tr><tr><td>GaroaBulk</td><td>1000</td><td>4.846 ms</td><td>1.611 ms</td><td>0.9586 ms</td><td>0.29</td><td>0.08</td><td>3.42 KB</td><td>0.001</td>
+</tr><tr><td>Dapper</td><td>10000</td><td>162.887 ms</td><td>122.263 ms</td><td>80.8692 ms</td><td>1.41</td><td>1.23</td><td>26544.08 KB</td><td>1.000</td>
+</tr><tr><td>ManualCopy</td><td>10000</td><td>39.209 ms</td><td>27.026 ms</td><td>16.0825 ms</td><td>0.34</td><td>0.27</td><td>3.99 KB</td><td>0.000</td>
+</tr><tr><td>GaroaBulk</td><td>10000</td><td>26.770 ms</td><td>11.218 ms</td><td>5.8670 ms</td><td>0.23</td><td>0.16</td><td>4.73 KB</td><td>0.000</td>
+</tr></tbody></table>
+</body>
+</html>
