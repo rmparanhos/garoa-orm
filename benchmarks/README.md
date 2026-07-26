@@ -27,9 +27,13 @@ with four methods (Dapper is the `[Baseline]`):
 `Manual` mirrors exactly what the source generator emits inline, so two comparisons matter:
 `GaroaGenerated` vs `Manual` shows whether the generated mapper's per-row machinery adds any
 overhead over hand-written code (if they tie, the generator is **at the floor**), and `Manual` vs
-`Dapper` shows how much of any gap is the driver's own typed-getter cost rather than Garoa. The
-`GaroaGenerated` vs `Garoa` gap isolates the source generator's effect (typed getters vs the generic
-`GetFieldValue<T>` dispatch).
+`Dapper` shows how much of any gap is the driver's own typed-getter cost rather than Garoa.
+
+`Garoa` vs `GaroaGenerated` isolates what the source generator is still worth. Both mappers now
+share the same read path (typed getters for BCL types, `GetFieldValue<T>` for provider-resolved
+ones), so they should land within noise of each other on these benchmarks — the generator's
+remaining edge is avoiding the runtime `.Compile()` and being AOT/trimming friendly, neither of
+which a steady-state benchmark measures.
 
 ## Bulk-insert benchmarks
 
@@ -117,9 +121,16 @@ CI-class machine; your absolute numbers will differ, the ratios should not):
 
 | Rows | Dapper      | Garoa       | Time ratio | Garoa allocated | Alloc ratio |
 | ---- | ----------- | ----------- | ---------- | --------------- | ----------- |
-| 1    | 8.07 μs     | 7.15 μs     | **0.89**   | 1.17 KB         | **0.75**    |
-| 100  | 164.2 μs    | 178.1 μs    | **1.08**   | 16.76 KB        | **0.69**    |
-| 1000 | 1,548 μs    | 1,727 μs    | **1.12**   | 153.9 KB        | **0.69**    |
+| 1    | 8.23 μs     | 7.26 μs     | **0.88**   | 1.17 KB         | **0.75**    |
+| 100  | 131.8 μs    | 123.2 μs    | **0.93**   | 16.76 KB        | **0.69**    |
+| 1000 | 1,260 μs    | 1,223 μs    | **0.97**   | 153.9 KB        | **0.69**    |
 
-Takeaways: Garoa is faster on single-row reads (less per-call setup), within ~12% of Dapper's
-IL-based mapper on large result sets, and consistently **allocates ~25–31% less memory**.
+Takeaways: Garoa is faster than Dapper across the board on in-memory SQLite and consistently
+**allocates ~25–31% less memory**. Over a real network connection the read ratios move toward 1.0
+(PostgreSQL 1.00 / 1.06 / 1.18, MySQL ~1.00 at every size) because the driver dominates — at 1 000
+PostgreSQL rows a *hand-written* mapper scores 1.15 in the same run, so most of that gap is
+Npgsql's own typed-getter cost rather than Garoa's machinery.
+
+These numbers date from the switch to typed reader getters in the runtime mapper; before it, the
+`Garoa` row read everything through the generic `GetFieldValue<T>` dispatch and ran 1.08–1.32x
+depending on the runner.
