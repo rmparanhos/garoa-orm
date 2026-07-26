@@ -25,17 +25,21 @@ completed.
 
 ## v1 — Core API
 
-The v1 surface is intentionally tiny:
+The surface is intentionally small — v1 shipped the first, fourth and fifth rows; the rest landed
+post-v1 as thin shells over the same core:
 
-| Operation                | Method                          | Notes                                   |
-| ------------------------ | ------------------------------- | --------------------------------------- |
-| SELECT                   | `Query<T>` → `List<T>`          | Cached mapper                           |
-| INSERT/UPDATE/DELETE     | `Execute`                       | Returns rows affected                   |
-| Bulk insert (high volume)| `BulkInsert<T>(IEnumerable<T>)` | Streaming, never materialised in memory |
+| Operation                | Method                              | Notes                                   |
+| ------------------------ | ----------------------------------- | --------------------------------------- |
+| SELECT                   | `Query<T>` → `List<T>`              | Cached mapper; `IN @ids` expansion      |
+| First row                | `QueryFirst[OrDefault]<T>`          | Shipped post-v1 (see below)             |
+| Exactly one row          | `QuerySingle[OrDefault]<T>`         | Shipped post-v1 (see below)             |
+| INSERT/UPDATE/DELETE     | `Execute`                           | Returns rows affected                   |
+| Bulk insert (high volume)| `BulkInsert<T>(IEnumerable<T>)`     | Streaming, never materialised in memory |
+| Bulk upsert (high volume)| `BulkUpsert<T>(rows, conflictKeys)` | Staging table + one set-based merge     |
 
-Explicitly **out of scope for v1**: `DynamicParameters`, `GridReader`, multi-map.
-(`QueryFirst`/`QueryFirstOrDefault` have since shipped — see "Requested but not yet scheduled";
-the stricter `QuerySingle*` remain deferred.)
+Explicitly **out of scope**: `DynamicParameters`, `GridReader`, multi-map. Each would need a
+parallel stack to what already exists. (The single-row families and `IN` expansion were the
+post-v1 additions that did fit as thin shells — see "Planned post-v1 API additions" below.)
 
 ### Result mapping
 
@@ -121,12 +125,15 @@ the stricter `QuerySingle*` remain deferred.)
 - [x] Performance CI: relative benchmark Garoa vs Dapper using BenchmarkDotNet
   `[Baseline]` (`benchmarks/Garoa.Benchmarks`). Runs on push to `main` **and on PRs
   targeting `main`** (trigger added). Threshold set to **1.40x** (`check_threshold.py` +
-  `GAROA_BENCH_THRESHOLD`) — loosened from 1.30x because the runtime mapper on a large in-memory
-  SQLite result set is noisy on shared runners (the generated mapper and hand-written Manual stay
-  <1.0x; a real regression would be 2-5x). Results published as an Actions artifact, committed to the
+  `GAROA_BENCH_THRESHOLD`) — loosened from 1.30x when the runtime mapper still read everything
+  through `GetFieldValue<T>` and swung 1.08–1.32x run-to-run on shared runners. The typed-getter
+  read path removed that noise, so the bound now has plenty of headroom (a real regression, e.g. a
+  broken mapper cache, would be 2-5x). Results published as an Actions artifact, committed to the
   `benchmark-results` branch for long-term tracking, and posted as a PR comment.
-  - Baseline numbers: Garoa is ~11% faster at 1 row, ~8–12% slower at 100–1000 rows, and
-    allocates ~25–31% less memory than Dapper.
+  - Baseline numbers (reads, Garoa ÷ Dapper): SQLite 0.88 / 0.93 / 0.97 at 1 / 100 / 1 000 rows;
+    PostgreSQL 1.00 / 1.06 / 1.18 (hand-written `Manual` scores 1.15 at 1 000, so the gap is the
+    driver); MySQL ~1.00 at every size. Allocates ~25–31% less memory than Dapper. Bulk paths run
+    at 0.34–0.79x of a Dapper multi-row `INSERT` while allocating 0.1–4% as much.
   - [x] Benchmark over real **PostgreSQL** and **MySQL** connections in addition to SQLite
     (`PostgresQueryBenchmarks`, `MySqlQueryBenchmarks` — same service containers as
     integration tests).
