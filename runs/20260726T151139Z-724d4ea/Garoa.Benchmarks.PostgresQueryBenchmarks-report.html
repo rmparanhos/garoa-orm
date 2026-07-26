@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Garoa.Benchmarks.PostgresQueryBenchmarks-20260726-150812</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat)
+AMD EPYC 9V74, 1 CPU, 4 logical and 2 physical cores
+.NET SDK 10.0.302
+  [Host]     : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  Job-AWMQLC : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+</code></pre>
+<pre><code>Runtime=.NET 8.0  IterationCount=8  LaunchCount=1  
+WarmupCount=3  
+</code></pre>
+
+<table>
+<thead><tr><th>Method  </th><th>Rows</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Dapper</td><td>1</td><td>196.9 &mu;s</td><td>4.17 &mu;s</td><td>1.85 &mu;s</td><td>1.00</td><td>0.01</td><td>-</td><td>969 B</td><td>1.00</td>
+</tr><tr><td>Manual</td><td>1</td><td>194.1 &mu;s</td><td>5.33 &mu;s</td><td>2.79 &mu;s</td><td>0.99</td><td>0.02</td><td>-</td><td>617 B</td><td>0.64</td>
+</tr><tr><td>Garoa</td><td>1</td><td>193.6 &mu;s</td><td>2.92 &mu;s</td><td>1.30 &mu;s</td><td>0.98</td><td>0.01</td><td>-</td><td>681 B</td><td>0.70</td>
+</tr><tr><td>GaroaGenerated</td><td>1</td><td>192.0 &mu;s</td><td>1.49 &mu;s</td><td>0.78 &mu;s</td><td>0.97</td><td>0.01</td><td>-</td><td>681 B</td><td>0.70</td>
+</tr><tr><td>Dapper</td><td>100</td><td>275.0 &mu;s</td><td>4.68 &mu;s</td><td>2.45 &mu;s</td><td>1.00</td><td>0.01</td><td>-</td><td>24057 B</td><td>1.00</td>
+</tr><tr><td>Manual</td><td>100</td><td>286.0 &mu;s</td><td>4.61 &mu;s</td><td>2.05 &mu;s</td><td>1.04</td><td>0.01</td><td>-</td><td>16577 B</td><td>0.69</td>
+</tr><tr><td>Garoa</td><td>100</td><td>290.8 &mu;s</td><td>4.87 &mu;s</td><td>2.16 &mu;s</td><td>1.06</td><td>0.01</td><td>-</td><td>16641 B</td><td>0.69</td>
+</tr><tr><td>GaroaGenerated</td><td>100</td><td>290.8 &mu;s</td><td>2.32 &mu;s</td><td>1.21 &mu;s</td><td>1.06</td><td>0.01</td><td>-</td><td>16641 B</td><td>0.69</td>
+</tr><tr><td>Dapper</td><td>1000</td><td>795.3 &mu;s</td><td>19.59 &mu;s</td><td>8.70 &mu;s</td><td>1.00</td><td>0.01</td><td>1.9531</td><td>229370 B</td><td>1.00</td>
+</tr><tr><td>Manual</td><td>1000</td><td>922.8 &mu;s</td><td>16.70 &mu;s</td><td>8.73 &mu;s</td><td>1.16</td><td>0.02</td><td>-</td><td>156996 B</td><td>0.68</td>
+</tr><tr><td>Garoa</td><td>1000</td><td>931.6 &mu;s</td><td>7.24 &mu;s</td><td>3.79 &mu;s</td><td>1.17</td><td>0.01</td><td>-</td><td>157063 B</td><td>0.68</td>
+</tr><tr><td>GaroaGenerated</td><td>1000</td><td>926.3 &mu;s</td><td>18.74 &mu;s</td><td>6.68 &mu;s</td><td>1.16</td><td>0.01</td><td>-</td><td>157067 B</td><td>0.68</td>
+</tr></tbody></table>
+</body>
+</html>
